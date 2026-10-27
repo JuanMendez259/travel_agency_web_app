@@ -87,6 +87,14 @@ El proyecto incluye la skill [Impeccable](https://github.com/pbakaus/impeccable)
 - El motor de Impeccable se descarga en el primer uso a `~/.impeccable/bin` (requiere red y permiso de escritura). Si el entorno no lo permite, la skill incluye el fallback documentado para leer directamente `PRODUCT.md`, `DESIGN.md` y sus referencias.
 - El proyecto todavía no tiene `PRODUCT.md`; el flujo `init` de la skill puede generarlo cuando se trabaje formalmente el sistema de diseño.
 
+## Despliegue
+
+- **Producción:** https://travel-agency-web-app-sepia.vercel.app
+- **Proyecto Vercel:** `dw-olf-development/travel-agency-web-app` (framework Vite, Node 24).
+- **Git:** `main` está conectado a Vercel; cada push despliega automáticamente.
+- **API:** `vercel.json` reescribe `/api/*` hacia la API de Railway para mantener el mismo origen y evitar problemas de CORS. No requiere `VITE_API_BASE_URL` en producción.
+- **Manual:** `vercel` crea un preview y `vercel --prod` despliega a producción.
+
 ## Scripts
 
 ```bash
