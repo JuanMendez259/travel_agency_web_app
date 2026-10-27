@@ -79,6 +79,14 @@ El bloque **Acceso rápido de pruebas** del login solo aparece en modo desarroll
 | Admin | `admin@travelagency.com` | `Admin123!` |
 | Cliente | `cliente@travelagency.com` | `Cliente123!` |
 
+## Diseño con Impeccable
+
+El proyecto incluye la skill [Impeccable](https://github.com/pbakaus/impeccable) **v4.8.0** en `.dsh/skills/impeccable`. DSH la descubre automáticamente al abrir el proyecto y queda disponible para tareas de diseño, crítica, auditoría, pulido y documentación de UI.
+
+- Úsala pidiendo, por ejemplo: *“usa impeccable para auditar el checkout”*.
+- El motor de Impeccable se descarga en el primer uso a `~/.impeccable/bin` (requiere red y permiso de escritura). Si el entorno no lo permite, la skill incluye el fallback documentado para leer directamente `PRODUCT.md`, `DESIGN.md` y sus referencias.
+- El proyecto todavía no tiene `PRODUCT.md`; el flujo `init` de la skill puede generarlo cuando se trabaje formalmente el sistema de diseño.
+
 ## Scripts
 
 ```bash
