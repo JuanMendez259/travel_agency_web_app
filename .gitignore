@@ -35,3 +35,9 @@ coverage
 
 # Unrelated local folder with its own git repository
 Sin título/
+
+# Vercel
+.vercel
+.env
+.env.local
+.env.*.local
