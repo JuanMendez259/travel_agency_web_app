@@ -181,6 +181,7 @@ Implementado el flujo completo de cliente y el back-office operativo. Pendientes
 - Descarga del pase como PNG y Apple/Google Wallet.
 - Pruebas E2E automatizadas con Playwright y pruebas de integración contra la API.
 - Endpoint de cotización en backend para eliminar el último cálculo de precio en cliente.
+- Borrado transaccional de viajes con `BookingRefunds`: la API actual conserva esos registros por FK Restrict. El panel limpia los POIs antes de borrar y bloquea con un mensaje claro cuando hay reembolsos o reservas canceladas.
 
 ## Créditos
 

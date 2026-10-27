@@ -26,6 +26,7 @@ import { useMemo, useState, type ReactNode } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import { useAuth } from "@/features/auth/AuthContext";
 import {
+  deletePoi,
   deleteTrip,
   finalizeTrip,
   getTransport,
@@ -64,11 +65,20 @@ export function StaffTripDetailPage() {
   const [pauseOpen, setPauseOpen] = useState(false);
   const [deleteOpen, setDeleteOpen] = useState(false);
   const [deleteMessage, setDeleteMessage] = useState("");
+  const [deleteError, setDeleteError] = useState<string | null>(null);
   const [plate, setPlate] = useState("");
   const [transportFile, setTransportFile] = useState<File | null>(null);
 
   const tripsQuery = useQuery({ queryKey: ["manageTrips"], queryFn: listManageTrips });
   const trip = (tripsQuery.data ?? []).find((item) => item.id === tripId) ?? null;
+  const bookings = trip?.bookings ?? [];
+  const deleteBlockers: string[] = [];
+  if (bookings.some((booking) => booking.status === "Cancelled" || Number(booking.refundTotal ?? 0) > 0)) {
+    deleteBlockers.push(
+      "Este viaje tiene reservas canceladas o reembolsos registrados. La API actual no elimina esos registros por integridad financiera, por lo que el viaje no se puede borrar todavía.",
+    );
+  }
+  const pointsOfInterest = trip?.pointsOfInterest ?? [];
   useDocumentTitle(trip ? trip.title : "Detalle del viaje");
 
   const ratingsQuery = useQuery({
@@ -113,14 +123,28 @@ export function StaffTripDetailPage() {
   });
 
   const deleteMutation = useMutation({
-    mutationFn: () => deleteTrip(tripId, deleteMessage.trim() || undefined),
+    mutationFn: async () => {
+      if (deleteBlockers.length) {
+        throw new Error(deleteBlockers[0]);
+      }
+      // La API no elimina los POIs antes del viaje (FK Restrict). Los quitamos
+      // primero desde su endpoint para que el borrado funcione en viajes con ruta.
+      for (const poi of pointsOfInterest) {
+        await deletePoi(tripId, poi.id);
+      }
+      return deleteTrip(tripId, deleteMessage.trim() || undefined);
+    },
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: ["manageTrips"] });
       void queryClient.invalidateQueries({ queryKey: ["trips"] });
       showToast("Viaje eliminado.", "success");
       navigate("/staff/trips", { replace: true });
     },
-    onError: (error) => showToast(error instanceof Error ? error.message : "No se pudo eliminar.", "error"),
+    onError: (error) => {
+      const message = error instanceof Error ? error.message : "No se pudo eliminar el viaje.";
+      setDeleteError(message);
+      showToast(message, "error");
+    },
   });
 
   const transportMutation = useMutation({
@@ -133,7 +157,6 @@ export function StaffTripDetailPage() {
     onError: (error) => showToast(error instanceof Error ? error.message : "No se pudo publicar.", "error"),
   });
 
-  const bookings = trip?.bookings ?? [];
   const capacityRequests = (trip?.capacityRequests ?? []).filter((request) => !request.isResolved);
   const ratings = ratingsQuery.data ?? [];
   const averageRating = useMemo(
@@ -549,7 +572,16 @@ export function StaffTripDetailPage() {
                   {trip.isActive ? <Pause className="size-4" /> : <Play className="size-4" />}
                   {trip.isActive ? "Pausar viaje" : "Reactivar viaje"}
                 </Button>
-                <Button variant="danger" size="md" className="w-full" onClick={() => setDeleteOpen(true)}>
+                <Button
+                  variant="danger"
+                  size="md"
+                  className="w-full"
+                  onClick={() => {
+                    setDeleteError(null);
+                    setDeleteMessage("");
+                    setDeleteOpen(true);
+                  }}
+                >
                   <Trash2 className="size-4" />
                   Eliminar viaje
                 </Button>
@@ -601,7 +633,11 @@ export function StaffTripDetailPage() {
               variant="danger"
               className="flex-1"
               loading={deleteMutation.isPending}
-              onClick={() => deleteMutation.mutate()}
+              disabled={deleteBlockers.length > 0}
+              onClick={() => {
+                setDeleteError(null);
+                deleteMutation.mutate();
+              }}
             >
               Eliminar definitivamente
             </Button>
@@ -619,11 +655,28 @@ export function StaffTripDetailPage() {
             onChange={(event) => setDeleteMessage(event.target.value)}
             placeholder={`Tu reserva para "${trip.title}" fue cancelada porque el viaje fue eliminado.`}
           />
+          {pointsOfInterest.length ? (
+            <p className="rounded-lg bg-surface-container-low p-2.5 text-body-sm text-on-surface-variant">
+              Se eliminarán también {pointsOfInterest.length} punto(s) de interés del itinerario.
+            </p>
+          ) : null}
           {bookings.some((booking) => booking.status !== "Cancelled") ? (
             <p className="rounded-lg bg-pending p-2.5 text-body-sm text-[#78350F]">
               Este viaje tiene {bookings.filter((booking) => booking.status !== "Cancelled").length} reserva(s)
               activa(s). Se perderá su historial operativo.
             </p>
+          ) : null}
+          {deleteBlockers.length ? (
+            <div role="alert" className="rounded-lg bg-error-container p-3 text-body-sm text-on-error-container">
+              <p className="font-semibold">No se puede eliminar este viaje</p>
+              <p className="mt-1">{deleteBlockers[0]}</p>
+              <p className="mt-1">Puedes pausarlo para ocultarlo del catálogo sin perder el historial.</p>
+            </div>
+          ) : null}
+          {deleteError ? (
+            <div role="alert" className="rounded-lg bg-error-container p-3 text-body-sm text-on-error-container">
+              {deleteError}
+            </div>
           ) : null}
         </div>
       </Modal>

@@ -34,6 +34,8 @@ export function Modal({
   const titleId = useId();
   const descriptionId = useId();
   const dialogRef = useRef<HTMLDivElement | null>(null);
+  const onCloseRef = useRef(onClose);
+  onCloseRef.current = onClose;
 
   useEffect(() => {
     if (!open) return;
@@ -44,9 +46,18 @@ export function Modal({
           'button:not([disabled]), [href], input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])',
         ) ?? [],
       );
-    const focusTimer = window.setTimeout(() => getFocusable()[0]?.focus(), 20);
+    // Focus a form field first when the modal has one; otherwise focus the
+    // first control. The effect intentionally depends only on `open` so
+    // parent re-renders while typing do not steal focus back to the header.
+    const focusTimer = window.setTimeout(() => {
+      const dialog = dialogRef.current;
+      const preferred = dialog?.querySelector<HTMLElement>(
+        '[data-autofocus], input:not([type="hidden"]):not([disabled]), textarea:not([disabled]), select:not([disabled])',
+      );
+      (preferred ?? getFocusable()[0])?.focus();
+    }, 20);
     const onKeyDown = (event: KeyboardEvent) => {
-      if (event.key === "Escape") onClose();
+      if (event.key === "Escape") onCloseRef.current();
       if (event.key !== "Tab") return;
       const items = getFocusable();
       if (!items.length) return;
@@ -69,7 +80,7 @@ export function Modal({
       document.body.style.overflow = previous;
       previousFocus?.focus?.();
     };
-  }, [open, onClose]);
+  }, [open]);
 
   if (!open) return null;
 
