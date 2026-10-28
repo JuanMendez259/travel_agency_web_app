@@ -164,6 +164,15 @@ export type Trip = {
   options?: TripOption[];
   fromPrice?: number | string | null;
   bookableCapacity?: number;
+  cancelledAt?: string | null;
+  cancelledByUserId?: number | null;
+  isCancelled?: boolean;
+};
+
+export type TripCancellationResult = {
+  trip: Trip;
+  bookingsCancelled: number;
+  totalRefunded: number | string;
 };
 
 export type TripUpsertInput = {

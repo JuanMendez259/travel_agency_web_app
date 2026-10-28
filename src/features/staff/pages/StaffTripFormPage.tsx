@@ -17,6 +17,7 @@ import { Select, Switch, TextArea, TextField } from "@/shared/components/ui/Form
 import { PageLoader } from "@/shared/components/ui/Media";
 import { PageHeader, SectionCard } from "@/shared/components/ui/Section";
 import { useToast } from "@/shared/components/ui/Toast";
+import { isTripCancelled } from "@/shared/lib/trip";
 import { useDocumentTitle } from "@/shared/hooks/useDocumentTitle";
 import {
   fromDateInputValue,
@@ -302,6 +303,19 @@ export function StaffTripFormPage() {
   if (editing && tripsQuery.isLoading) return <PageLoader label="Cargando viaje…" />;
   if (editing && !tripsQuery.isLoading && !trip) {
     return <EmptyState title="Viaje no encontrado" description="Puede que se haya eliminado." />;
+  }
+  if (editing && trip && isTripCancelled(trip)) {
+    return (
+      <EmptyState
+        title="Este viaje está cancelado"
+        description="Los viajes cancelados conservan su historial y no se pueden editar."
+        action={
+          <Link to={`/staff/trips/${tripId}`} className={buttonClasses({ variant: "secondary" })}>
+            Volver al detalle
+          </Link>
+        }
+      />
+    );
   }
 
   const twoFloors = form.transportType === "Camion" && form.hasTwoFloors;

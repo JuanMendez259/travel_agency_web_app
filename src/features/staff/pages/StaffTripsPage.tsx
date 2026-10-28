@@ -29,10 +29,10 @@ import { useToast } from "@/shared/components/ui/Toast";
 import { useDocumentTitle } from "@/shared/hooks/useDocumentTitle";
 import { formatMxn } from "@/shared/lib/money";
 import { formatTripDetailDate } from "@/shared/lib/dates";
-import { bookableCapacity, soldSeats, transportLabel } from "@/shared/lib/trip";
+import { bookableCapacity, isTripCancelled, soldSeats, transportLabel } from "@/shared/lib/trip";
 import { cn } from "@/shared/lib/cn";
 
-type Filter = "all" | "active" | "paused";
+type Filter = "all" | "active" | "paused" | "cancelled";
 
 export function StaffTripsPage() {
   const { session } = useAuth();
@@ -63,6 +63,9 @@ export function StaffTripsPage() {
   const filtered = useMemo(() => {
     const term = search.trim().toLowerCase();
     return trips.filter((trip) => {
+      const cancelled = isTripCancelled(trip);
+      if (filter === "cancelled" && !cancelled) return false;
+      if (filter !== "cancelled" && cancelled) return false;
       if (filter === "active" && !trip.isActive) return false;
       if (filter === "paused" && trip.isActive) return false;
       if (!term) return true;
@@ -72,8 +75,9 @@ export function StaffTripsPage() {
 
   const counts = {
     all: trips.length,
-    active: trips.filter((trip) => trip.isActive).length,
-    paused: trips.filter((trip) => !trip.isActive).length,
+    active: trips.filter((trip) => trip.isActive && !isTripCancelled(trip)).length,
+    paused: trips.filter((trip) => !trip.isActive && !isTripCancelled(trip)).length,
+    cancelled: trips.filter(isTripCancelled).length,
   };
 
   return (
@@ -104,12 +108,13 @@ export function StaffTripsPage() {
               className="h-11 min-w-0 flex-1 bg-transparent text-body-md outline-none placeholder:text-outline"
             />
           </label>
-          <div className="flex gap-2">
+          <div className="flex gap-2 overflow-x-auto pb-1">
             {(
               [
                 { key: "all", label: "Todos", count: counts.all },
                 { key: "active", label: "Activos", count: counts.active },
                 { key: "paused", label: "Pausados", count: counts.paused },
+                { key: "cancelled", label: "Cancelados", count: counts.cancelled },
               ] as Array<{ key: Filter; label: string; count: number }>
             ).map((item) => (
               <Chip
@@ -167,10 +172,14 @@ export function StaffTripsPage() {
               <article key={trip.id} className="flex flex-col overflow-hidden rounded-card bg-white shadow-layer-1">
                 <div className="relative">
                   <CoverImage src={trip.imageUrl} alt={trip.title} ratio="aspect-[16/9]" />
-                  <div className="absolute top-2.5 left-2.5 flex gap-1.5">
-                    {!trip.isActive ? <Badge tone="cancelled">PAUSADO</Badge> : null}
-                    {trip.finalized ? <Badge tone="neutral">Finalizado</Badge> : null}
-                    {trip.departureCompleted ? <Badge tone="pending">Salida realizada</Badge> : null}
+                  <div className="absolute top-2.5 left-2.5 flex flex-wrap gap-1.5">
+                    {isTripCancelled(trip) ? (
+                      <Badge tone="cancelled">CANCELADO</Badge>
+                    ) : !trip.isActive ? (
+                      <Badge tone="cancelled">PAUSADO</Badge>
+                    ) : null}
+                    {!isTripCancelled(trip) && trip.finalized ? <Badge tone="neutral">Finalizado</Badge> : null}
+                    {!isTripCancelled(trip) && trip.departureCompleted ? <Badge tone="pending">Salida realizada</Badge> : null}
                   </div>
                 </div>
                 <div className="flex flex-1 flex-col gap-2 p-4">
@@ -219,7 +228,7 @@ export function StaffTripsPage() {
                       <Users className="size-3.5" />
                       Asientos
                     </Link>
-                    {isAdmin ? (
+                    {isAdmin && !isTripCancelled(trip) ? (
                       <Button
                         variant={trip.isActive ? "ghost" : "secondary"}
                         size="sm"

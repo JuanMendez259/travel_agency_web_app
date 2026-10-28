@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { Trip, TripOption } from "@/shared/api/types";
-import { bookableCapacity, displayPrice } from "@/shared/lib/trip";
+import { bookableCapacity, displayPrice, isTripCancelled } from "@/shared/lib/trip";
 
 const trip = {
   id: 1,
@@ -37,6 +37,12 @@ describe("cupo y precios de viaje", () => {
     expect(bookableCapacity({ ...trip, includesHotel: true, hotelCapacity: 20 })).toBe(20);
     expect(bookableCapacity({ ...trip, includesHotel: true, hotelCapacity: 60 })).toBe(50);
     expect(bookableCapacity({ ...trip, includesHotel: false, hotelCapacity: 20 })).toBe(50);
+  });
+
+  it("detecta viajes cancelados por fecha o por bandera calculada", () => {
+    expect(isTripCancelled({ cancelledAt: "2026-10-28T00:00:00Z" })).toBe(true);
+    expect(isTripCancelled({ isCancelled: true })).toBe(true);
+    expect(isTripCancelled({ cancelledAt: null, isCancelled: false })).toBe(false);
   });
 
   it("muestra el menor precio de las opciones activas", () => {

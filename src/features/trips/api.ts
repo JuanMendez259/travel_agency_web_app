@@ -6,6 +6,7 @@ import type {
   TransportType,
   Trip,
   TripOption,
+  TripCancellationResult,
   TripOptionInput,
   TripRating,
   TripTransportInfo,
@@ -53,9 +54,15 @@ export function updateTrip(tripId: number, input: TripUpsertInput) {
 }
 
 export function deleteTrip(tripId: number, message?: string) {
-  return apiRequest<void>(`/api/trips/${tripId}`, {
+  return apiRequest<{ notified: number; imagesDeleted?: number }>(`/api/trips/${tripId}`, {
     method: "DELETE",
     body: message ? { message } : undefined,
+  });
+}
+
+export function cancelTrip(tripId: number) {
+  return apiRequest<TripCancellationResult>(`/api/trips/${tripId}/cancel`, {
+    method: "POST",
   });
 }
 

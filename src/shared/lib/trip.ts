@@ -54,6 +54,12 @@ export function isCancellationAvailable(trip: Trip | null | undefined): boolean 
   );
 }
 
+export function isTripCancelled(
+  trip: Pick<Trip, "cancelledAt" | "isCancelled">,
+): boolean {
+  return Boolean(trip.cancelledAt || trip.isCancelled);
+}
+
 export function tripStatusLabel(trip: Trip): string {
   if (trip.departureCompleted) return "Salida realizada";
   if (trip.finalized) return "Finalizado";

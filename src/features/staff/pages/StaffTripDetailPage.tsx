@@ -21,12 +21,13 @@ import {
   Trash2,
   Users,
   Wallet,
+  XCircle,
 } from "lucide-react";
 import { useMemo, useState, type ReactNode } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import { useAuth } from "@/features/auth/AuthContext";
 import {
-  deletePoi,
+  cancelTrip,
   deleteTrip,
   finalizeTrip,
   getTransport,
@@ -35,7 +36,7 @@ import {
   publishTransport,
   setTripActive,
 } from "@/features/trips/api";
-import type { Booking } from "@/shared/api/types";
+import type { Booking, TripCancellationResult } from "@/shared/api/types";
 import { ErrorState } from "@/shared/components/feedback/ErrorState";
 import { EmptyState } from "@/shared/components/feedback/EmptyState";
 import { Badge } from "@/shared/components/ui/Badge";
@@ -48,9 +49,9 @@ import { StarRating } from "@/shared/components/ui/StarRating";
 import { TextArea, TextField } from "@/shared/components/ui/Form";
 import { useToast } from "@/shared/components/ui/Toast";
 import { useDocumentTitle } from "@/shared/hooks/useDocumentTitle";
-import { formatMxn } from "@/shared/lib/money";
+import { formatMxn, toDecimal } from "@/shared/lib/money";
 import { formatTripDetailDate } from "@/shared/lib/dates";
-import { bookableCapacity, soldSeats, transportLabel } from "@/shared/lib/trip";
+import { bookableCapacity, isTripCancelled, soldSeats, transportLabel } from "@/shared/lib/trip";
 import { formatPhone, telHref, whatsappHref } from "@/shared/lib/phone";
 
 export function StaffTripDetailPage() {
@@ -66,19 +67,29 @@ export function StaffTripDetailPage() {
   const [deleteOpen, setDeleteOpen] = useState(false);
   const [deleteMessage, setDeleteMessage] = useState("");
   const [deleteError, setDeleteError] = useState<string | null>(null);
+  const [cancelOpen, setCancelOpen] = useState(false);
+  const [cancelError, setCancelError] = useState<string | null>(null);
+  const [cancelResult, setCancelResult] = useState<TripCancellationResult | null>(null);
   const [plate, setPlate] = useState("");
   const [transportFile, setTransportFile] = useState<File | null>(null);
 
   const tripsQuery = useQuery({ queryKey: ["manageTrips"], queryFn: listManageTrips });
   const trip = (tripsQuery.data ?? []).find((item) => item.id === tripId) ?? null;
   const bookings = trip?.bookings ?? [];
-  const deleteBlockers: string[] = [];
-  if (bookings.some((booking) => booking.status === "Cancelled" || Number(booking.refundTotal ?? 0) > 0)) {
-    deleteBlockers.push(
-      "Este viaje tiene reservas canceladas o reembolsos registrados. La API actual no elimina esos registros por integridad financiera, por lo que el viaje no se puede borrar todavía.",
-    );
-  }
   const pointsOfInterest = trip?.pointsOfInterest ?? [];
+  const cancelled = trip ? isTripCancelled(trip) : false;
+  const activeBookings = bookings.filter(
+    (booking) => booking.status === "Pending" || booking.status === "Confirmed",
+  );
+  const totalPaid = activeBookings.reduce(
+    (sum, booking) =>
+      sum.plus(
+        (booking.payments ?? [])
+          .filter((payment) => payment.status === "Completed")
+          .reduce((paid, payment) => paid.plus(toDecimal(payment.amount)), toDecimal(0)),
+      ),
+    toDecimal(0),
+  );
   useDocumentTitle(trip ? trip.title : "Detalle del viaje");
 
   const ratingsQuery = useQuery({
@@ -122,18 +133,27 @@ export function StaffTripDetailPage() {
     onError: (error) => showToast(error instanceof Error ? error.message : "No se pudo actualizar.", "error"),
   });
 
-  const deleteMutation = useMutation({
-    mutationFn: async () => {
-      if (deleteBlockers.length) {
-        throw new Error(deleteBlockers[0]);
-      }
-      // La API no elimina los POIs antes del viaje (FK Restrict). Los quitamos
-      // primero desde su endpoint para que el borrado funcione en viajes con ruta.
-      for (const poi of pointsOfInterest) {
-        await deletePoi(tripId, poi.id);
-      }
-      return deleteTrip(tripId, deleteMessage.trim() || undefined);
+  const cancelTripMutation = useMutation({
+    mutationFn: () => cancelTrip(tripId),
+    onSuccess: (result) => {
+      invalidate();
+      setCancelOpen(false);
+      setCancelError(null);
+      setCancelResult(result);
+      showToast(
+        `Viaje cancelado. ${result.bookingsCancelled} reserva(s) y ${formatMxn(result.totalRefunded)} devueltos a wallet.`,
+        "success",
+      );
     },
+    onError: (error) => {
+      const message = error instanceof Error ? error.message : "No se pudo cancelar el viaje.";
+      setCancelError(message);
+      showToast(message, "error");
+    },
+  });
+
+  const deleteMutation = useMutation({
+    mutationFn: () => deleteTrip(tripId, deleteMessage.trim() || undefined),
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: ["manageTrips"] });
       void queryClient.invalidateQueries({ queryKey: ["trips"] });
@@ -212,20 +232,35 @@ export function StaffTripDetailPage() {
         title={trip.title}
         subtitle={`${trip.destination} · ${formatTripDetailDate(trip.startDate)}`}
         action={
-          <>
-            {isAdmin ? (
-              <Link to={`/staff/trips/${trip.id}/edit`} className={buttonClasses({ variant: "primary", size: "md" })}>
-                <Pencil className="size-4" />
-                Editar
-              </Link>
-            ) : null}
-            <Button variant="outline" size="md" onClick={() => setFinalizeOpen(true)}>
-              <CheckCircle2 className="size-4" />
-              {trip.finalized ? "Reabrir viaje" : "Finalizar"}
-            </Button>
-          </>
+          cancelled ? null : (
+            <>
+              {isAdmin ? (
+                <Link to={`/staff/trips/${trip.id}/edit`} className={buttonClasses({ variant: "primary", size: "md" })}>
+                  <Pencil className="size-4" />
+                  Editar
+                </Link>
+              ) : null}
+              <Button variant="outline" size="md" onClick={() => setFinalizeOpen(true)}>
+                <CheckCircle2 className="size-4" />
+                {trip.finalized ? "Reabrir viaje" : "Finalizar"}
+              </Button>
+            </>
+          )
         }
       />
+
+      {cancelled ? (
+        <div className="rounded-card border border-error/20 bg-error-container p-4 text-on-error-container shadow-layer-1">
+          <p className="flex items-center gap-2 text-title-md">
+            <XCircle className="size-5" />
+            Viaje cancelado por la agencia
+          </p>
+          <p className="mt-1 text-body-sm">
+            Las reservas activas fueron canceladas y el 100% de lo abonado se acreditó al monedero de cada cliente.
+            {trip.cancelledAt ? ` Cancelado el ${formatTripDetailDate(trip.cancelledAt)}.` : ""}
+          </p>
+        </div>
+      ) : null}
 
       <div className="overflow-hidden rounded-card bg-white shadow-layer-1">
         <div className="relative">
@@ -234,9 +269,15 @@ export function StaffTripDetailPage() {
           <div className="absolute inset-x-0 bottom-0 flex flex-wrap items-end justify-between gap-2 p-4 text-white">
             <div>
               <div className="flex flex-wrap gap-1.5">
-                {!trip.isActive ? <Badge tone="cancelled">PAUSADO</Badge> : null}
-                {trip.finalized ? <Badge tone="neutral">Finalizado</Badge> : null}
-                {trip.departureCompleted ? <Badge tone="pending">Salida realizada</Badge> : null}
+                {cancelled ? (
+                  <Badge tone="cancelled">CANCELADO</Badge>
+                ) : (
+                  <>
+                    {!trip.isActive ? <Badge tone="cancelled">PAUSADO</Badge> : null}
+                    {trip.finalized ? <Badge tone="neutral">Finalizado</Badge> : null}
+                    {trip.departureCompleted ? <Badge tone="pending">Salida realizada</Badge> : null}
+                  </>
+                )}
                 <Badge>{transportLabel(trip.transportType)}</Badge>
               </div>
               <p className="mt-1.5 inline-flex items-center gap-1.5 text-body-sm text-white/90">
@@ -251,7 +292,12 @@ export function StaffTripDetailPage() {
         </div>
         <div className="grid gap-2 p-3 sm:grid-cols-4">
           <StatCard label="Vendidos" value={sold} icon={<Ticket className="size-4" />} />
-          <StatCard label="Disponibles" value={trip.availableSeats} tone="emerald" icon={<Users className="size-4" />} />
+          <StatCard
+            label="Disponibles"
+            value={cancelled ? "—" : trip.availableSeats}
+            tone="emerald"
+            icon={<Users className="size-4" />}
+          />
           <StatCard label="Capacidad" value={capacity} tone="slate" icon={<Bus className="size-4" />} />
           <StatCard
             label="Ocupación"
@@ -294,7 +340,7 @@ export function StaffTripDetailPage() {
             subtitle="El cupo efectivo nunca supera la capacidad del hotel"
             icon={<Hotel className="size-5" />}
             action={
-              isAdmin ? (
+              isAdmin && !cancelled ? (
                 <Link to={`/staff/trips/${trip.id}/options`} className={buttonClasses({ variant: "outline", size: "sm" })}>
                   Administrar opciones
                 </Link>
@@ -463,7 +509,7 @@ export function StaffTripDetailPage() {
             <p className="mt-1 text-body-md text-on-surface">
               Placas: <strong>{transport?.plate ?? "Por confirmar"}</strong>
             </p>
-            {isAdmin ? (
+            {isAdmin && !cancelled ? (
               <div className="mt-3 space-y-2 rounded-[12px] bg-surface-container-low p-3">
                 <TextField
                   label="Placas"
@@ -527,13 +573,13 @@ export function StaffTripDetailPage() {
                   Reservas y pagos
                 </Link>
               ) : null}
-              {isAdmin ? (
+              {isAdmin && !cancelled ? (
                 <Link to={`/staff/trips/${trip.id}/map`} className={buttonClasses({ variant: "secondary", size: "md", className: "w-full" })}>
                   <MapPinned className="size-4" />
                   Mapa e itinerario
                 </Link>
               ) : null}
-              {isAdmin ? (
+              {isAdmin && !cancelled ? (
                 <Link to={`/staff/trips/${trip.id}/checkin`} className={buttonClasses({ variant: "secondary", size: "md", className: "w-full" })}>
                   <QrCode className="size-4" />
                   Check-in / Salida
@@ -546,15 +592,17 @@ export function StaffTripDetailPage() {
                 <FileClock className="size-4" />
                 Historial de cambios
               </Link>
-              <Button
-                variant={trip.finalized ? "outline" : "secondary"}
-                size="md"
-                className="w-full"
-                onClick={() => setFinalizeOpen(true)}
-              >
-                <CheckCircle2 className="size-4" />
-                {trip.finalized ? "Reabrir viaje" : "Finalizar viaje"}
-              </Button>
+              {!cancelled ? (
+                <Button
+                  variant={trip.finalized ? "outline" : "secondary"}
+                  size="md"
+                  className="w-full"
+                  onClick={() => setFinalizeOpen(true)}
+                >
+                  <CheckCircle2 className="size-4" />
+                  {trip.finalized ? "Reabrir viaje" : "Finalizar viaje"}
+                </Button>
+              ) : null}
             </div>
             <p className="mt-2 text-body-sm text-on-surface-variant">
               Finalizar libera la unidad y habilita las calificaciones. No cierra el check-in.
@@ -564,14 +612,42 @@ export function StaffTripDetailPage() {
           {isAdmin ? (
             <SectionCard title="Administración" icon={<Pencil className="size-5" />}>
               <div className="space-y-2">
-                <Link to={`/staff/trips/${trip.id}/edit`} className={buttonClasses({ variant: "secondary", size: "md", className: "w-full" })}>
-                  <Pencil className="size-4" />
-                  Editar viaje
-                </Link>
-                <Button variant="outline" size="md" className="w-full" onClick={() => setPauseOpen(true)}>
-                  {trip.isActive ? <Pause className="size-4" /> : <Play className="size-4" />}
-                  {trip.isActive ? "Pausar viaje" : "Reactivar viaje"}
-                </Button>
+                {!cancelled ? (
+                  <>
+                    {!trip.finalized && !trip.departureCompleted ? (
+                      <Button
+                        variant="danger"
+                        size="md"
+                        className="w-full"
+                        onClick={() => {
+                          setCancelError(null);
+                          setCancelOpen(true);
+                        }}
+                      >
+                        <XCircle className="size-4" />
+                        Cancelar viaje (100% a wallet)
+                      </Button>
+                    ) : (
+                      <p className="rounded-[12px] bg-surface-container-low p-3 text-body-sm text-on-surface-variant">
+                        {trip.finalized
+                          ? "El viaje está finalizado; no se puede cancelar."
+                          : "La salida ya se realizó; no se puede cancelar."}
+                      </p>
+                    )}
+                    <Link to={`/staff/trips/${trip.id}/edit`} className={buttonClasses({ variant: "secondary", size: "md", className: "w-full" })}>
+                      <Pencil className="size-4" />
+                      Editar viaje
+                    </Link>
+                    <Button variant="outline" size="md" className="w-full" onClick={() => setPauseOpen(true)}>
+                      {trip.isActive ? <Pause className="size-4" /> : <Play className="size-4" />}
+                      {trip.isActive ? "Pausar viaje" : "Reactivar viaje"}
+                    </Button>
+                  </>
+                ) : (
+                  <p className="rounded-[12px] bg-surface-container-low p-3 text-body-sm text-on-surface-variant">
+                    Este viaje conserva su historial. No se puede editar, reactivar, finalizar ni operar check-in.
+                  </p>
+                )}
                 <Button
                   variant="danger"
                   size="md"
@@ -619,11 +695,81 @@ export function StaffTripDetailPage() {
         onConfirm={() => pauseMutation.mutate()}
       />
 
+      <ConfirmDialog
+        open={cancelOpen}
+        onClose={() => setCancelOpen(false)}
+        title="Cancelar viaje"
+        description="Se devolverá el 100% de lo abonado a la wallet de cada cliente."
+        confirmLabel="Cancelar viaje y devolver 100%"
+        tone="danger"
+        loading={cancelTripMutation.isPending}
+        onConfirm={() => {
+          setCancelError(null);
+          cancelTripMutation.mutate();
+        }}
+      >
+        <div className="space-y-3">
+          <div className="rounded-[12px] bg-surface-container-low p-3 text-body-sm">
+            <div className="flex justify-between">
+              <span className="text-on-surface-variant">Reservas activas</span>
+              <strong className="text-on-surface">{activeBookings.length}</strong>
+            </div>
+            <div className="mt-1 flex justify-between">
+              <span className="text-on-surface-variant">Total abonado a devolver</span>
+              <strong className="text-on-surface">{formatMxn(totalPaid)}</strong>
+            </div>
+          </div>
+          <p className="text-body-sm text-on-surface-variant">
+            Se cancelarán las reservas pendientes y confirmadas, se acreditará el 100% de los pagos
+            completados y el viaje quedará desactivado. Las reservas que el cliente ya había cancelado
+            no se modifican ni reciben un segundo reembolso.
+          </p>
+          <p className="rounded-lg bg-pending p-2.5 text-body-sm text-[#78350F]">
+            Esta acción no elimina el viaje. Para borrarlo definitivamente usa “Eliminar viaje” después
+            de cancelarlo; el API bloqueará el borrado si existe dinero real.
+          </p>
+          {cancelError ? (
+            <p role="alert" className="rounded-lg bg-error-container px-3 py-2 text-body-sm text-on-error-container">
+              {cancelError}
+            </p>
+          ) : null}
+        </div>
+      </ConfirmDialog>
+
+      <Modal
+        open={Boolean(cancelResult)}
+        onClose={() => setCancelResult(null)}
+        title="Viaje cancelado"
+        description="El historial financiero se conservó en la wallet de los clientes."
+        footer={
+          <Button className="w-full" onClick={() => setCancelResult(null)}>
+            Entendido
+          </Button>
+        }
+      >
+        {cancelResult ? (
+          <div className="space-y-3">
+            <div className="rounded-[12px] bg-confirmed p-4">
+              <p className="text-title-md text-on-surface">
+                {cancelResult.bookingsCancelled} reserva(s) cancelada(s)
+              </p>
+              <p className="text-body-md text-on-surface-variant">
+                Total devuelto a wallet: <strong>{formatMxn(cancelResult.totalRefunded)}</strong>
+              </p>
+            </div>
+            <p className="text-body-sm text-on-surface-variant">
+              Los clientes recibieron un aviso. Pueden usar el saldo en otro viaje o solicitar un
+              reembolso desde su perfil. El viaje ya no aparece en el catálogo público.
+            </p>
+          </div>
+        ) : null}
+      </Modal>
+
       <Modal
         open={deleteOpen}
         onClose={() => setDeleteOpen(false)}
         title="Eliminar viaje"
-        description="Esta acción no se puede deshacer y cancelará las reservas pendientes o confirmadas."
+        description="Solo se puede eliminar un viaje sin dinero real. Si tiene pagos o reembolsos, usa Cancelar viaje para devolver el 100% a la wallet."
         footer={
           <div className="flex gap-2">
             <Button variant="outline" className="flex-1" onClick={() => setDeleteOpen(false)}>
@@ -633,7 +779,6 @@ export function StaffTripDetailPage() {
               variant="danger"
               className="flex-1"
               loading={deleteMutation.isPending}
-              disabled={deleteBlockers.length > 0}
               onClick={() => {
                 setDeleteError(null);
                 deleteMutation.mutate();
@@ -646,7 +791,8 @@ export function StaffTripDetailPage() {
       >
         <div className="space-y-3">
           <p className="text-body-md text-on-surface-variant">
-            Se notificará a los clientes con reservas pendientes o confirmadas.
+            Se eliminarán el viaje, sus reservas sin dinero real, asientos, opciones, POIs, imágenes
+            y registros de $0. Se notificará a los clientes con reservas pendientes o confirmadas.
           </p>
           <TextArea
             label="Mensaje para los clientes (opcional)"
@@ -665,13 +811,6 @@ export function StaffTripDetailPage() {
               Este viaje tiene {bookings.filter((booking) => booking.status !== "Cancelled").length} reserva(s)
               activa(s). Se perderá su historial operativo.
             </p>
-          ) : null}
-          {deleteBlockers.length ? (
-            <div role="alert" className="rounded-lg bg-error-container p-3 text-body-sm text-on-error-container">
-              <p className="font-semibold">No se puede eliminar este viaje</p>
-              <p className="mt-1">{deleteBlockers[0]}</p>
-              <p className="mt-1">Puedes pausarlo para ocultarlo del catálogo sin perder el historial.</p>
-            </div>
           ) : null}
           {deleteError ? (
             <div role="alert" className="rounded-lg bg-error-container p-3 text-body-sm text-on-error-container">

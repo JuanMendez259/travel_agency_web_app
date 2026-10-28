@@ -322,11 +322,23 @@ export function ProfilePage() {
             </div>
           </section>
 
+          <div id="billetera" className="scroll-mt-24">
           <SectionCard
             title="Mi billetera"
             subtitle="Saldo a favor generado por reembolsos"
             icon={<Wallet className="size-5" />}
-            action={<span className="text-price-display text-primary-container">{formatMxn(available)}</span>}
+            action={
+              <div className="flex flex-col items-end gap-0.5">
+                <span className="text-price-display text-primary-container">{formatMxn(available)}</span>
+                {available.gt(0) ? (
+                  <a href="#payout-form" className="text-label-sm text-secondary underline">
+                    Solicitar reembolso
+                  </a>
+                ) : (
+                  <span className="text-label-sm text-outline">Solicitar reembolso</span>
+                )}
+              </div>
+            }
           >
             <div className="grid gap-2 sm:grid-cols-3">
               <div className="rounded-[12px] bg-surface-container-low p-3">
@@ -381,7 +393,7 @@ export function ProfilePage() {
             </div>
 
             {available.gt(0) ? (
-              <div className="mt-4 rounded-[14px] bg-surface-container-low p-3">
+              <div id="payout-form" className="mt-4 scroll-mt-24 rounded-[14px] bg-surface-container-low p-3">
                 <p className="text-label-md text-on-surface">Solicitar reembolso de mi saldo</p>
                 <p className="mt-0.5 text-body-sm text-on-surface-variant">
                   La agencia revisará tu solicitud y te contactará para entregarte el monto.
@@ -446,6 +458,7 @@ export function ProfilePage() {
               </div>
             ) : null}
           </SectionCard>
+          </div>
 
           <SectionCard title="Configuración" icon={<Smartphone className="size-5" />}>
             <div className="space-y-3">

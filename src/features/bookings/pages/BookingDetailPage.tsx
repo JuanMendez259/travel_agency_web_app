@@ -207,6 +207,10 @@ export function BookingDetailPage() {
   const pending = pendingAmount(booking);
   const settled = toDecimal(pending).lte(0);
   const cancelled = booking.status === "Cancelled";
+  const cancelledByAgency =
+    cancelled &&
+    booking.cancelledByUserId != null &&
+    booking.cancelledByUserId !== booking.userId;
   const refundTotal = toDecimal(booking.refundTotal ?? 0);
   const walletAvailable = toDecimal(walletQuery.data?.available ?? 0);
   const walletMax = toDecimal(minMoney(walletAvailable, pending));
@@ -352,7 +356,9 @@ export function BookingDetailPage() {
                 <p className="mt-1 text-body-md text-on-surface-variant">
                   {cancelled
                     ? refundTotal.gt(0)
-                      ? `Saldo a favor: ${formatMxn(refundTotal)}. Ya está disponible en tu monedero.`
+                      ? cancelledByAgency
+                        ? `La agencia canceló el viaje. El 100% de lo abonado (${formatMxn(refundTotal)}) está en tu monedero.`
+                        : `Saldo a favor: ${formatMxn(refundTotal)}. Ya está disponible en tu monedero.`
                       : "Esta reserva fue cancelada y no generó saldo a favor."
                     : settled
                       ? `Pagaste ${formatMxn(paid)} del total. Tu lugar está confirmado.`
@@ -407,22 +413,35 @@ export function BookingDetailPage() {
           {cancelled ? (
             <SectionCard title="Tu reserva fue cancelada" icon={<XCircle className="size-5 text-error" />}>
               <p className="text-body-md text-on-surface-variant">
-                {booking.cancelledByUserId === booking.userId
-                  ? "Cancelaste esta reserva."
-                  : "La agencia canceló esta reserva."}{" "}
+                {cancelledByAgency
+                  ? "La agencia canceló el viaje."
+                  : "Cancelaste esta reserva."}{" "}
                 {booking.cancelledAt ? `El ${formatDateTime(booking.cancelledAt)}.` : ""}
               </p>
               <p className="mt-2 text-body-md text-on-surface-variant">
                 {refundTotal.gt(0)
-                  ? `Se acreditaron ${formatMxn(refundTotal)} a tu saldo a favor.`
+                  ? cancelledByAgency
+                    ? `El 100% de lo abonado (${formatMxn(refundTotal)}) está en tu monedero. Puedes usarlo en otro viaje o solicitar el reembolso.`
+                    : `Se acreditaron ${formatMxn(refundTotal)} a tu saldo a favor.`
                   : "No se generó reembolso para esta reserva."}
               </p>
-              <Link
-                to="/bookings"
-                className={cn(buttonClasses({ variant: "secondary", size: "md" }), "mt-3")}
-              >
-                Ver mis viajes
-              </Link>
+              <div className="mt-3 flex flex-wrap gap-2">
+                {refundTotal.gt(0) ? (
+                  <Link
+                    to="/profile#billetera"
+                    className={buttonClasses({ variant: "primary", size: "md" })}
+                  >
+                    <Wallet className="size-4" />
+                    Ver saldo y solicitar reembolso
+                  </Link>
+                ) : null}
+                <Link
+                  to="/bookings"
+                  className={buttonClasses({ variant: "secondary", size: "md" })}
+                >
+                  Ver mis viajes
+                </Link>
+              </div>
             </SectionCard>
           ) : (
             <SectionCard

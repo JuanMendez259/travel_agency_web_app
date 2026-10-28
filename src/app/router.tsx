@@ -43,8 +43,17 @@ import { StaffShell } from "@/shared/components/layout/StaffShell";
 function RootLayout() {
   const location = useLocation();
   useEffect(() => {
+    if (location.hash) {
+      const timer = window.setTimeout(() => {
+        document.getElementById(decodeURIComponent(location.hash.slice(1)))?.scrollIntoView({
+          behavior: "smooth",
+          block: "start",
+        });
+      }, 120);
+      return () => window.clearTimeout(timer);
+    }
     window.scrollTo(0, 0);
-  }, [location.pathname]);
+  }, [location.pathname, location.hash]);
   return <Outlet />;
 }
 

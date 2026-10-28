@@ -241,7 +241,9 @@ export function MyBookingsPage() {
                       <p className="inline-flex items-center gap-1.5 text-body-sm text-error">
                         <AlertTriangle className="size-3.5" />
                         {cancelledByAgency
-                          ? "Cancelado por la agencia"
+                          ? toDecimal(booking.refundTotal ?? 0).gt(0)
+                            ? "Cancelado por la agencia · 100% acreditado a tu monedero"
+                            : "Cancelado por la agencia"
                           : "Cancelado por el usuario"}
                         {toDecimal(booking.refundTotal ?? 0).gt(0)
                           ? ` · Saldo a favor ${formatMxn(booking.refundTotal ?? 0)}`
@@ -287,6 +289,15 @@ export function MyBookingsPage() {
                         >
                           <Ticket className="size-3.5" />
                           QR acompañantes
+                        </Link>
+                      ) : null}
+                      {booking.status === "Cancelled" &&
+                      toDecimal(booking.refundTotal ?? 0).gt(0) ? (
+                        <Link
+                          to="/profile#billetera"
+                          className={buttonClasses({ variant: "secondary", size: "sm" })}
+                        >
+                          Ver saldo y solicitar reembolso
                         </Link>
                       ) : null}
                     </div>
