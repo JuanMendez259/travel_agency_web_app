@@ -134,7 +134,8 @@ src/
 - **Dinero:** se manejan strings/decimales con `decimal.js` y se formatean con `Intl.NumberFormat("es-MX")`.
 - **Sesión:** JWT en `sessionStorage`; ante un `401` se limpia la sesión y se redirige al login. No se guardan contraseñas.
 - **Canonizaciones aplicadas:** estados en español, propiedad de la cancelación según quién la hizo, QR oculto en reservas canceladas, pago manual sin método “Wallet”, y cálculo del checkout con las opciones seleccionadas.
-- **Inconsistencias conocidas del backend** (documentadas en la especificación) se señalan en la UI cuando afectan al staff, por ejemplo: la cancelación administrativa no genera reembolso automático a la wallet.
+- **Cancelar ≠ eliminar:** “Cancelar viaje” devuelve el 100% de lo pagado a la wallet, conserva reservas e historial y desactiva el viaje. “Eliminar viaje” solo procede si no hay dinero real; la API responde 409 con un mensaje legible y la UI lo muestra.
+- **Inconsistencias conocidas del backend** se señalan en la UI cuando afectan al staff.
 - **Escaneo QR:** usa `BarcodeDetector`/cámara mediante `jsQR`; si el navegador o el permiso fallan, siempre queda la verificación manual por token.
 - **Mapas:** Leaflet con tiles de OpenStreetMap; la búsqueda de lugares usa Nominatim y tiene fallback a marcado manual.
 
@@ -181,7 +182,7 @@ Implementado el flujo completo de cliente y el back-office operativo. Pendientes
 - Descarga del pase como PNG y Apple/Google Wallet.
 - Pruebas E2E automatizadas con Playwright y pruebas de integración contra la API.
 - Endpoint de cotización en backend para eliminar el último cálculo de precio en cliente.
-- Borrado transaccional de viajes con `BookingRefunds`: la API actual conserva esos registros por FK Restrict. El panel limpia los POIs antes de borrar y bloquea con un mensaje claro cuando hay reembolsos o reservas canceladas.
+- Borrado de viajes con historial financiero real: la API conserva esos registros y responde 409; el panel recomienda cancelar y conservar el historial.
 
 ## Créditos
 
