@@ -46,9 +46,9 @@ function classify(message: string): Tag {
   return { label: "Avisos", icon: Megaphone, className: "bg-surface-container text-on-surface-variant" };
 }
 
-function groupNotifications(items: Notification[]) {
+export function groupNotifications(items: Notification[]) {
   const sorted = [...items].sort(
-    (a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime(),
+    (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime(),
   );
   const groups: Array<{ key: string; label: string; items: Notification[] }> = [];
   for (const item of sorted) {
@@ -57,7 +57,7 @@ function groupNotifications(items: Notification[]) {
     if (existing) existing.items.push(item);
     else groups.push({ key, label: noticeDayLabel(item.createdAt), items: [item] });
   }
-  return groups.reverse();
+  return groups;
 }
 
 export function NotificationsPage() {
