@@ -87,6 +87,16 @@ El proyecto incluye la skill [Impeccable](https://github.com/pbakaus/impeccable)
 - El motor de Impeccable se descarga en el primer uso a `~/.impeccable/bin` (requiere red y permiso de escritura). Si el entorno no lo permite, la skill incluye el fallback documentado para leer directamente `PRODUCT.md`, `DESIGN.md` y sus referencias.
 - El proyecto todavía no tiene `PRODUCT.md`; el flujo `init` de la skill puede generarlo cuando se trabaje formalmente el sistema de diseño.
 
+## Grafo de conocimiento con Graphify
+
+El proyecto incluye la skill [Graphify](https://github.com/Graphify-Labs/graphify) **v0.9.97** en `.dsh/skills/graphify` y en `.agents/skills/graphify` (formato Agent Skills). El CLI `graphify` 0.9.97 está instalado globalmente.
+
+- Úsala pidiendo, por ejemplo: *“usa graphify para mapear la arquitectura de este proyecto”*.
+- Genera `graphify-out/` con `graph.json`, `GRAPH_REPORT.md`, visualización HTML y, opcionalmente, wiki/Obsidian.
+- El grafo es persistente: las consultas posteriores usan `graphify query` en lugar de releer archivos.
+- Los artefactos generados (`graphify-out/`) se ignoran en Git; la skill y sus referencias sí se versionan.
+- La extracción con LLM requiere que el proveedor/modelo esté configurado según la documentación de Graphify.
+
 ## Despliegue
 
 - **Producción:** https://travel-agency-web-app-sepia.vercel.app

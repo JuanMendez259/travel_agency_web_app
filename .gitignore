@@ -41,3 +41,6 @@ Sin título/
 .env
 .env.local
 .env.*.local
+
+# Graphify generated artifacts
+graphify-out/
