@@ -1,5 +1,5 @@
 import { fireEvent, render, screen, within } from "@testing-library/react";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import type { TripImage } from "@/shared/api/types";
 import { TripImageCarousel } from "@/shared/components/trips/TripImageCarousel";
 
@@ -37,6 +37,25 @@ describe("TripImageCarousel", () => {
     expect(
       screen.getByRole("img", { name: "Viaje a Oaxaca (1 de 2)" }),
     ).toHaveAttribute("src", "https://cdn.test/uno.jpg");
+  });
+
+  it("avisa el índice actual al ampliar la imagen", () => {
+    const images = [
+      makeImage({ id: 1, order: 1, url: "https://cdn.test/uno.jpg" }),
+      makeImage({ id: 2, order: 2, url: "https://cdn.test/dos.jpg" }),
+    ];
+    const onImageClick = vi.fn();
+
+    render(
+      <TripImageCarousel images={images} alt="Viaje a Oaxaca" onImageClick={onImageClick} />,
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "Ampliar imagen" }));
+    expect(onImageClick).toHaveBeenLastCalledWith(0);
+
+    fireEvent.click(screen.getByRole("button", { name: "Imagen siguiente" }));
+    fireEvent.click(screen.getByRole("button", { name: "Ampliar imagen" }));
+    expect(onImageClick).toHaveBeenLastCalledWith(1);
   });
 
   it("muestra el contador junto a las miniaturas y lo actualiza", () => {

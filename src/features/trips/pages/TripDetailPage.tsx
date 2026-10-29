@@ -30,10 +30,12 @@ import { Button, buttonClasses } from "@/shared/components/ui/Button";
 import { Counter } from "@/shared/components/ui/Counter";
 import { TextArea } from "@/shared/components/ui/Form";
 import { PageLoader, RichText } from "@/shared/components/ui/Media";
+import { ImageLightbox } from "@/shared/components/ui/ImageLightbox";
 import { SectionCard } from "@/shared/components/ui/Section";
 import { Switch } from "@/shared/components/ui/Form";
 import { useToast } from "@/shared/components/ui/Toast";
 import { TripImageCarousel } from "@/shared/components/trips/TripImageCarousel";
+import { buildTripGallery } from "@/shared/lib/trip-gallery";
 import { AGENCY } from "@/shared/lib/agency";
 import {
   formatDateLong,
@@ -79,6 +81,7 @@ export function TripDetailPage() {
   const [needsNote, setNeedsNote] = useState("");
   const [capacitySeats, setCapacitySeats] = useState(2);
   const [capacityMessage, setCapacityMessage] = useState("");
+  const [viewerIndex, setViewerIndex] = useState<number | null>(null);
   const initializedFor = useRef<number | null>(null);
 
   useDocumentTitle(trip?.title);
@@ -136,6 +139,11 @@ export function TripDetailPage() {
       multiplyMoney(trip.childPrice ?? trip.price, children),
     ).toFixed(2);
   }, [trip, useOptions, optionLines, options, adults, children]);
+
+  const gallery = useMemo(
+    () => buildTripGallery(trip?.images, trip?.imageUrl),
+    [trip?.images, trip?.imageUrl],
+  );
 
   const capacityMutation = useMutation({
     mutationFn: (vars: { tripId: number; seats: number; message: string | null }) =>
@@ -260,18 +268,19 @@ export function TripDetailPage() {
           alt={trip.title}
           ratio="aspect-[16/10] sm:aspect-[21/9]"
           priority
+          onImageClick={(index) => setViewerIndex(index)}
           overlay={
             <>
               <div className="pointer-events-none absolute inset-0 bg-gradient-to-t from-slate/80 via-slate/10 to-transparent" />
-              <div className="absolute inset-x-0 top-0 flex items-center justify-between gap-2 p-3">
+              <div className="pointer-events-none absolute inset-x-0 top-0 flex items-center justify-between gap-2 p-3">
                 <Link
                   to="/explore"
-                  className="inline-flex items-center gap-1.5 rounded-full bg-white/90 px-3 py-2 text-label-md text-primary-container shadow-layer-2 backdrop-blur"
+                  className="pointer-events-auto inline-flex items-center gap-1.5 rounded-full bg-white/90 px-3 py-2 text-label-md text-primary-container shadow-layer-2 backdrop-blur"
                 >
                   <ArrowLeft className="size-4" />
                   Volver
                 </Link>
-                <div className="flex gap-2">
+                <div className="pointer-events-auto flex gap-2">
                   <button
                     type="button"
                     onClick={() => void handleShare()}
@@ -303,7 +312,7 @@ export function TripDetailPage() {
                   </button>
                 </div>
               </div>
-              <div className="absolute inset-x-0 bottom-0 p-4 text-white sm:p-6">
+              <div className="pointer-events-none absolute inset-x-0 bottom-0 p-4 text-white sm:p-6">
                 <div className="flex flex-wrap gap-2">
                   <Badge className="bg-white/90 text-primary-container">
                     <Bus className="size-3.5" />
@@ -327,6 +336,15 @@ export function TripDetailPage() {
           }
         />
       </div>
+
+      {viewerIndex !== null ? (
+        <ImageLightbox
+          images={gallery}
+          initialIndex={viewerIndex}
+          alt={trip.title}
+          onClose={() => setViewerIndex(null)}
+        />
+      ) : null}
 
       {closed ? (
         <div className="flex items-start gap-3 rounded-[16px] border border-pending bg-pending/60 p-4">

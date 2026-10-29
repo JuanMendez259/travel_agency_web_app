@@ -3,6 +3,7 @@ import { useMemo, useState, type ReactNode } from "react";
 import type { TripImage } from "@/shared/api/types";
 import { CoverImage } from "@/shared/components/ui/Media";
 import { cn } from "@/shared/lib/cn";
+import { buildTripGallery } from "@/shared/lib/trip-gallery";
 
 export function TripImageCarousel({
   images,
@@ -12,6 +13,7 @@ export function TripImageCarousel({
   overlay,
   className,
   priority = false,
+  onImageClick,
 }: {
   images?: TripImage[] | null;
   fallbackUrl?: string | null;
@@ -20,15 +22,12 @@ export function TripImageCarousel({
   overlay?: ReactNode;
   className?: string;
   priority?: boolean;
+  onImageClick?: (index: number) => void;
 }) {
-  const gallery = useMemo<{ id?: number; url: string }[]>(() => {
-    const ordered = [...(images ?? [])]
-      .filter((image) => Boolean(image.url))
-      .sort((a, b) => a.order - b.order || a.id - b.id)
-      .map((image) => ({ id: image.id, url: image.url }));
-    if (ordered.length) return ordered;
-    return fallbackUrl ? [{ url: fallbackUrl }] : [];
-  }, [images, fallbackUrl]);
+  const gallery = useMemo(
+    () => buildTripGallery(images, fallbackUrl),
+    [images, fallbackUrl],
+  );
 
   const [activeIndex, setActiveIndex] = useState(0);
 
@@ -54,6 +53,14 @@ export function TripImageCarousel({
           loading={priority ? "eager" : "lazy"}
           className="size-full object-cover"
         />
+        {onImageClick ? (
+          <button
+            type="button"
+            aria-label="Ampliar imagen"
+            onClick={() => onImageClick(currentIndex)}
+            className="absolute inset-0 z-0 cursor-zoom-in focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-white"
+          />
+        ) : null}
         {overlay}
         {hasMultiple ? (
           <>
