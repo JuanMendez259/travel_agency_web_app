@@ -97,6 +97,16 @@ El proyecto incluye la skill [Graphify](https://github.com/Graphify-Labs/graphif
 - Los artefactos generados (`graphify-out/`) se ignoran en Git; la skill y sus referencias sí se versionan.
 - La extracción con LLM requiere que el proveedor/modelo esté configurado según la documentación de Graphify.
 
+## Arquitectura y grafo de conocimiento
+
+El mapa de arquitectura generado con Graphify está en [docs/architecture-graph.md](docs/architecture-graph.md). Incluye las comunidades detectadas, nodos centrales, conexiones entre módulos y preguntas sugeridas.
+
+![Grafo de conocimiento de src](docs/screenshots/grafo-conocimiento.jpg)
+
+- **510 nodos · 2,885 aristas · 13 comunidades** sobre 89 archivos de `src/`.
+- Salida interactiva local: `graphify-out/graph.html` (no versionada).
+- Para regenerarlo: `graphify src` o pide “usa graphify para actualizar el grafo de src”.
+
 ## Despliegue
 
 - **Producción:** https://travel-agency-web-app-sepia.vercel.app
