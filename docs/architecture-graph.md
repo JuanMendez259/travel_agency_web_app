@@ -1,7 +1,7 @@
 # Arquitectura y grafo de conocimiento
 
-> Generado con **Graphify 0.9.97** sobre `src/` (89 archivos TypeScript/TSX, ~51,877 palabras).
-> Fecha: 2026-10-28 · commit `933382f8`.
+> Generado con **Graphify 0.9.97** sobre `src/` (91 archivos TypeScript/TSX, ~52,954 palabras).
+> Fecha: 2026-10-28 · commit `76e65fd5`.
 > Artefactos interactivos locales: `graphify-out/graph.html`, `graphify-out/graph.json`, `graphify-out/GRAPH_REPORT.md`.
 
 ## Lectura de arquitectura
@@ -10,22 +10,22 @@ La aplicación es una SPA React organizada en tres capas:
 
 1. **App shell:** `src/main.tsx` → `App` → providers (React Query, Auth, Toast) → router con guards por rol → `ClientShell` / `StaffShell`.
 2. **Features:** `auth`, `trips`, `bookings`, `staff`, `profile`, `favorites`, `notifications` y `company`. Cada feature agrupa páginas, hooks de datos y módulos de API.
-3. **Shared:** cliente HTTP (`apiRequest`), tipos del contrato, kit de UI, mapa/asientos y utilidades de dinero, fechas, ICS, teléfono y política de reembolso.
+3. **Shared:** cliente HTTP (`apiRequest`), tipos del contrato, kit de UI, mapa/asientos y utilidades de dinero, fechas, imágenes, ICS, teléfono y política de reembolso.
 
 Flujo de datos dominante:
 
 ```text
-Page/Component → TanStack Query hook → features/*/api.ts → apiRequest() → /api → Railway → Supabase
+Página/Componente → TanStack Query hook → features/*/api.ts → apiRequest() → /api → Railway → Supabase
 ```
 
-Los nodos puente del grafo son `apiRequest()` (85 edges), `cn()` (80), `Button()` (64), `useDocumentTitle()` (61), `EmptyState()` (57), `PageHeader()` (56) y `useAuth()` (46). Esto confirma que la app está bien centralizada en infraestructura compartida, aunque también explica la baja cohesión de las comunidades de bookings y staff.
+La galería de viajes sube hasta 10 imágenes por viaje. El cliente reduce imágenes grandes a 1920 px y WebP antes de enviarlas; el API valida formato, tamaño máximo de 20 MB, re-encodea y aplica la portada.
 
 ## Hallazgos
 
 - **Sin ciclos de imports.**
-- **Checkout (0.32)** y **Profile/Wallet (0.24)** son las comunidades más cohesivas y acotadas.
-- **Bookings/refunds (0.07)**, **Staff admin (0.06)** y **Trip management (0.09)** son comunidades amplias; son candidatas naturales a extraerse por subdominio si el proyecto sigue creciendo.
-- `apiRequest`, `cn` y `useAuth` son los principales bridges entre comunidades.
+- Comunidades más cohesivas: **Ratings (0.50)**, **Auth API contracts (0.40)**, **HTTP client/errors (0.33)**, **Profile/Wallet (0.27)** y **Discounts/finance (0.27)**.
+- Comunidades amplias o débiles: **Auth/navigation (0.05)**, **Bookings/refunds (0.08)**, **Domain types (0.08)** y **Dates/images/notifications (0.08)**. Son candidatas a subdividirse por subdominio.
+- `apiRequest`, `cn`, `useAuth`, `useToast` y el kit de UI son los principales puentes entre comunidades.
 - El CSS de tokens (`src/shared/styles/tokens.css`) no entró al grafo por la heurística de archivos sensibles (la palabra “tokens” en el nombre), no porque contenga secretos.
 
 ## Reporte de Graphify
@@ -33,32 +33,35 @@ Los nodos puente del grafo son `apiRequest()` (85 edges), `cn()` (80), `Button()
 # Graph Report - src  (2026-10-28)
 
 ## Corpus Check
-- 89 files · ~51,877 words
+- 91 files · ~52,954 words
 - Verdict: corpus is large enough that graph structure adds value.
 - Unclassified: 1 file(s) not represented in the graph (top: .css 1)
 
 ## Summary
-- 510 nodes · 2885 edges · 13 communities (11 shown, 2 thin omitted)
-- Extraction: 99% EXTRACTED · 1% INFERRED · 0% AMBIGUOUS · INFERRED: 27 edges (avg confidence: 0.85)
+- 522 nodes · 2912 edges · 16 communities (14 shown, 2 thin omitted)
+- Extraction: 99% EXTRACTED · 1% INFERRED · 0% AMBIGUOUS · INFERRED: 28 edges (avg confidence: 0.85)
 - Token cost: 0 input · 0 output
 
 ## Graph Freshness
-- Built from commit: `933382f8`
+- Built from commit: `76e65fd5`
 - Run `git rev-parse HEAD` and compare to check if the graph is stale.
 - Run `graphify update .` after code changes (no API cost).
 
 ## Community Hubs (Navigation)
-- Bookings & refunds core
-- Shared UI & booking flows
-- Staff admin & API client
-- Trip discovery & favorites
-- Auth, router & app shells
-- Trip management domain
-- Dates, ICS & trip form
-- Maps, modals & itinerary
-- App bootstrap & toasts
-- Profile, wallet & payouts
-- Checkout & seat selection
+- HTTP client and errors
+- Auth and app navigation
+- Staff admin and UI kit
+- Discounts and staff finance
+- Auth API contracts
+- Trip management screens
+- Bookings and refunds
+- Dates, images and notifications
+- Checkout and UI primitives
+- Domain types and contracts
+- API client and bookings
+- Maps and itinerary
+- Profile and wallet
+- Ratings interface
 
 ## God Nodes (most connected - your core abstractions)
 1. `apiRequest()` - 85 edges
@@ -73,67 +76,79 @@ Los nodos puente del grafo son `apiRequest()` (85 edges), `cn()` (80), `Button()
 10. `useAuth()` - 46 edges
 
 ## Surprising Connections (you probably didn't know these)
-- `socialLogin()` --calls--> `apiRequest()`  [EXTRACTED]
-  features/auth/api.ts → shared/api/client.ts
-- `AppProviders()` --calls--> `AuthProvider()`  [EXTRACTED]
-  app/providers.tsx → features/auth/AuthContext.tsx
-- `NotFoundPage()` --calls--> `buttonClasses()`  [EXTRACTED]
-  app/router.tsx → shared/components/ui/Button.tsx
-- `login()` --calls--> `apiRequest()`  [EXTRACTED]
-  features/auth/api.ts → shared/api/client.ts
-- `register()` --calls--> `apiRequest()`  [EXTRACTED]
-  features/auth/api.ts → shared/api/client.ts
-- `LoginPage()` --calls--> `errorMessage()`  [EXTRACTED]
-  features/auth/pages/LoginPage.tsx → shared/api/client.ts
+- `StaffCheckinPage()` --indirect_call--> `listManageTrips()`  [INFERRED]
+  src/features/staff/pages/StaffCheckinPage.tsx → src/features/trips/api.ts
+- `StaffExpensesPage()` --indirect_call--> `listManageTrips()`  [INFERRED]
+  src/features/staff/pages/StaffExpensesPage.tsx → src/features/trips/api.ts
+- `StaffPayoutsPage()` --indirect_call--> `listUsers()`  [INFERRED]
+  src/features/staff/pages/StaffPayoutsPage.tsx → src/features/profile/api.ts
+- `StaffScanPage()` --indirect_call--> `listManageTrips()`  [INFERRED]
+  src/features/staff/pages/StaffScanPage.tsx → src/features/trips/api.ts
+- `StaffTripBookingsPage()` --indirect_call--> `listManageTrips()`  [INFERRED]
+  src/features/staff/pages/StaffTripBookingsPage.tsx → src/features/trips/api.ts
+- `StaffDiscountsPage()` --indirect_call--> `listManageTrips()`  [INFERRED]
+  src/features/staff/pages/StaffDiscountsPage.tsx → src/features/trips/api.ts
 
 ## Import Cycles
 - None detected.
 
-## Communities (13 total, 2 thin omitted)
+## Communities (16 total, 2 thin omitted)
 
-### Community 0 - "Bookings & refunds core"
-Cohesion: 0.07
-Nodes (67): cancelBooking(), cancelTicket(), listAllBookings(), listTripBookings(), listUserBookings(), payWithWallet(), registerPayment(), updateBookingStatus() (+59 more)
+### Community 11 - "HTTP client and errors"
+Cohesion: 0.33
+Nodes (7): ApiError, RequestOptions, ApiErrorKind, apiUpload(), parseError(), kindFromStatus(), messageFromStatus()
 
-### Community 1 - "Shared UI & booking flows"
+### Community 0 - "Auth and app navigation"
+Cohesion: 0.05
+Nodes (64): AuthContextValue, Mode, LoginValues, RegisterValues, Session, AuthResponse, NavItem, TextFieldProps (+56 more)
+
+### Community 1 - "Staff admin and UI kit"
 Cohesion: 0.13
-Nodes (54): isStaffRole(), addPassengers(), checkinBooking(), checkinByToken(), checkinPassenger(), getBooking(), AddPassengersPage(), Row (+46 more)
+Nodes (63): Row, CreateForm, AuditLog, SelectProps, SwitchProps, TextAreaProps, checkinBooking(), checkinPassenger() (+55 more)
 
-### Community 2 - "Staff admin & API client"
-Cohesion: 0.06
-Nodes (60): createCoordinator(), createDiscount(), createExpense(), deleteCoordinator(), deleteDiscount(), deleteExpense(), listAuditLog(), listCoordinators() (+52 more)
+### Community 10 - "Discounts and staff finance"
+Cohesion: 0.27
+Nodes (12): FormState, Discount, DiscountInput, PayoutRequest, TripExpense, createDiscount(), deleteDiscount(), listDiscounts() (+4 more)
 
-### Community 3 - "Trip discovery & favorites"
-Cohesion: 0.10
-Nodes (45): useFavorites(), useToggleFavorite(), FavoritesPage(), addFavorite(), getMyRating(), getTrip(), listFavorites(), listTrips() (+37 more)
+### Community 13 - "Auth API contracts"
+Cohesion: 0.40
+Nodes (4): LoginRequest, RegisterRequest, SocialAuthResponse, socialLogin()
 
-### Community 4 - "Auth, router & app shells"
-Cohesion: 0.08
-Nodes (40): RequireAuth(), RequireGuest(), RequireRole(), HomeRedirect(), NotFoundPage(), login(), register(), AuthContext (+32 more)
-
-### Community 5 - "Trip management domain"
+### Community 2 - "Trip management screens"
 Cohesion: 0.09
-Nodes (37): socialLogin(), InfoLine(), StaffTripDetailPage(), Filter, StaffTripsPage(), cancelTrip(), deleteTrip(), finalizeTrip() (+29 more)
+Nodes (52): FormState, Filter, TripCardProps, Tone, InfoLine(), StaffTripDetailPage(), emptyForm(), StaffTripOptionsPage() (+44 more)
 
-### Community 6 - "Dates, ICS & trip form"
-Cohesion: 0.10
-Nodes (32): groupNotifications(), CATEGORIES, defaultEnd(), defaultStart(), emptyForm(), FormState, fromTrip(), StaffTripFormPage() (+24 more)
+### Community 3 - "Bookings and refunds"
+Cohesion: 0.08
+Nodes (49): Booking, BookingStatus, PaymentStatus, PayoutStatus, Tone, MoneyValue, cancelBooking(), cancelTicket() (+41 more)
 
-### Community 7 - "Maps, modals & itinerary"
-Cohesion: 0.13
-Nodes (19): Mode, SearchResult, StaffTripMapPage(), createPoi(), deletePoi(), updatePoi(), updateRoute(), CDMX (+11 more)
+### Community 4 - "Dates, images and notifications"
+Cohesion: 0.08
+Nodes (41): Tag, FormState, Notification, isStaffRole(), classify(), groupNotifications(), NotificationsPage(), listNotifications() (+33 more)
 
-### Community 8 - "App bootstrap & toasts"
-Cohesion: 0.16
-Nodes (10): App(), AppProviders(), queryClient, router, ToastContext, ToastContextValue, ToastItem, ToastProvider() (+2 more)
+### Community 5 - "Checkout and UI primitives"
+Cohesion: 0.11
+Nodes (29): CheckoutDraft, PassengerDraft, BookingOptionInput, Seat, SeatRow, ButtonProps, ButtonVariant, Size (+21 more)
 
-### Community 9 - "Profile, wallet & payouts"
-Cohesion: 0.24
-Nodes (15): getMyProfile(), getMyStats(), getWallet(), listMyPayouts(), requestPayout(), updateMyProfile(), ProfilePage(), transactionLabels (+7 more)
+### Community 6 - "Domain types and contracts"
+Cohesion: 0.08
+Nodes (31): AdminStats, BookingItem, BookingPassenger, CancelTicketResult, CapacityRequest, Coordinator, CreateCoordinatorRequest, CreatedCoordinator (+23 more)
 
-### Community 10 - "Checkout & seat selection"
-Cohesion: 0.32
-Nodes (11): createBooking(), CheckoutDraft, clearCheckoutDraft(), key(), readCheckoutDraft(), saveCheckoutDraft(), CheckoutPage(), PassengerDraft (+3 more)
+### Community 7 - "API client and bookings"
+Cohesion: 0.17
+Nodes (15): CancelBookingResult, CheckinTokenResult, CreateBookingRequest, CreatePassengersRequest, Payment, PaymentMethod, addPassengers(), checkinByToken() (+7 more)
+
+### Community 8 - "Maps and itinerary"
+Cohesion: 0.19
+Nodes (13): Mode, SearchResult, MapMarker, MapMarkerKind, MapViewProps, StaffTripMapPage(), createPoi(), deletePoi() (+5 more)
+
+### Community 9 - "Profile and wallet"
+Cohesion: 0.27
+Nodes (13): UserProfile, WalletSummary, WalletType, getMyProfile(), getMyStats(), getWallet(), listMyPayouts(), requestPayout() (+5 more)
+
+### Community 12 - "Ratings interface"
+Cohesion: 0.50
+Nodes (6): getMyRating(), getTrip(), upsertRating(), RateTripPage(), ratingLabel(), StarRating()
 
 ## Knowledge Gaps
 - **2 thin communities (<3 nodes) omitted from report** — run `graphify query` to explore isolated nodes.
@@ -141,15 +156,15 @@ Nodes (11): createBooking(), CheckoutDraft, clearCheckoutDraft(), key(), readChe
 ## Suggested Questions
 _Questions this graph is uniquely positioned to answer:_
 
-- **Why does `cn()` connect `Trip discovery & favorites` to `Bookings & refunds core`, `Shared UI & booking flows`, `Staff admin & API client`, `Auth, router & app shells`, `Trip management domain`, `Maps, modals & itinerary`, `App bootstrap & toasts`, `Profile, wallet & payouts`, `Checkout & seat selection`?**
-  _High betweenness centrality (0.061) - this node is a cross-community bridge._
-- **Should `Bookings & refunds core` be split into smaller, more focused modules?**
-  _Cohesion score 0.07199529826623567 - nodes in this community are weakly interconnected._
-- **Why does `apiRequest()` connect `Staff admin & API client` to `Bookings & refunds core`, `Shared UI & booking flows`, `Trip discovery & favorites`, `Auth, router & app shells`, `Trip management domain`, `Dates, ICS & trip form`, `Maps, modals & itinerary`, `Profile, wallet & payouts`, `Checkout & seat selection`?**
-  _High betweenness centrality (0.047) - this node is a cross-community bridge._
-- **Should `Shared UI & booking flows` be split into smaller, more focused modules?**
-  _Cohesion score 0.13069233617178821 - nodes in this community are weakly interconnected._
-- **Why does `useAuth()` connect `Auth, router & app shells` to `Bookings & refunds core`, `Shared UI & booking flows`, `Trip discovery & favorites`, `Trip management domain`, `Dates, ICS & trip form`, `Maps, modals & itinerary`, `Profile, wallet & payouts`, `Checkout & seat selection`?**
+- **Why does `cn()` connect `Auth and app navigation` to `Staff admin and UI kit`, `Trip management screens`, `Bookings and refunds`, `Dates, images and notifications`, `Checkout and UI primitives`, `Maps and itinerary`, `Profile and wallet`, `Ratings interface`?**
+  _High betweenness centrality (0.058) - this node is a cross-community bridge._
+- **Should `Auth and app navigation` be split into smaller, more focused modules?**
+  _Cohesion score 0.0506578947368421 - nodes in this community are weakly interconnected._
+- **Why does `apiRequest()` connect `API client and bookings` to `Auth and app navigation`, `Staff admin and UI kit`, `Trip management screens`, `Bookings and refunds`, `Dates, images and notifications`, `Checkout and UI primitives`, `Domain types and contracts`, `Maps and itinerary`, `Profile and wallet`, `Discounts and staff finance`, `HTTP client and errors`, `Ratings interface`, `Auth API contracts`?**
+  _High betweenness centrality (0.045) - this node is a cross-community bridge._
+- **Should `Staff admin and UI kit` be split into smaller, more focused modules?**
+  _Cohesion score 0.12643678160919541 - nodes in this community are weakly interconnected._
+- **Why does `useAuth()` connect `Auth and app navigation` to `Staff admin and UI kit`, `Trip management screens`, `Bookings and refunds`, `Dates, images and notifications`, `Checkout and UI primitives`, `Maps and itinerary`, `Profile and wallet`?**
   _High betweenness centrality (0.019) - this node is a cross-community bridge._
-- **Should `Staff admin & API client` be split into smaller, more focused modules?**
-  _Cohesion score 0.06376811594202898 - nodes in this community are weakly interconnected._
+- **Should `Trip management screens` be split into smaller, more focused modules?**
+  _Cohesion score 0.08864767073722297 - nodes in this community are weakly interconnected._

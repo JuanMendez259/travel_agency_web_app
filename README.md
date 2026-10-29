@@ -23,7 +23,7 @@ Construida con **React 19 + TypeScript + Vite + Tailwind CSS v4**, siguiendo el 
 
 ### Back-office
 
-- **Viajes:** listado, pausar/reactivar, crear/editar con hotel, dos pisos, fechas, precios y publicación de imagen.
+- **Viajes:** listado, pausar/reactivar, crear/editar con hotel, dos pisos, fechas, precios y galería de hasta 10 imágenes optimizadas.
 - **Detalle del viaje:** KPIs, pasajeros, solicitudes de cupo, opciones, unidad de transporte, opiniones, finalizar/reabrir y eliminación.
 - **Reservas y pagos:** filtros, búsqueda, registro de pagos manuales, confirmación, cancelación y cancelación de boletos.
 - **Check-in:** apertura/cierre, marcado de salida, abordaje del titular y acompañantes, QR y escaneo con cámara (`jsQR`) con verificación manual de respaldo.
@@ -103,7 +103,7 @@ El mapa de arquitectura generado con Graphify está en [docs/architecture-graph.
 
 ![Grafo de conocimiento de src](docs/screenshots/grafo-conocimiento.jpg)
 
-- **510 nodos · 2,885 aristas · 13 comunidades** sobre 89 archivos de `src/`.
+- **522 nodos · 2,912 aristas · 16 comunidades** sobre 91 archivos de `src/`.
 - Salida interactiva local: `graphify-out/graph.html` (no versionada).
 - Para regenerarlo: `graphify src` o pide “usa graphify para actualizar el grafo de src”.
 
