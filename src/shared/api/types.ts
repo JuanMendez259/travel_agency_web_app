@@ -75,6 +75,11 @@ export type TripImage = {
   createdAt: string;
 };
 
+export type TripImagesUploadResult = {
+  trip: Trip;
+  uploaded: TripImage[];
+};
+
 export type TripOption = {
   id: number;
   tripId: number;

@@ -7,6 +7,7 @@ import type {
   Trip,
   TripOption,
   TripCancellationResult,
+  TripImagesUploadResult,
   TripOptionInput,
   TripRating,
   TripTransportInfo,
@@ -90,13 +91,10 @@ export function updateDeparture(
   });
 }
 
-export function uploadTripImage(tripId: number, file: File) {
+export function uploadTripImages(tripId: number, files: File[]) {
   const form = new FormData();
-  form.append("file", file);
-  return apiUpload<Trip | { imageUrl?: string; url?: string }>(
-    `/api/trips/${tripId}/image`,
-    form,
-  );
+  files.forEach((file) => form.append("files", file, file.name));
+  return apiUpload<TripImagesUploadResult>(`/api/trips/${tripId}/images`, form);
 }
 
 export function getTransport(tripId: number) {

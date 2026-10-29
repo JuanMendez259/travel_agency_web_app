@@ -1,13 +1,13 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { ArrowLeft, ImagePlus, Save, ShieldAlert } from "lucide-react";
-import { useEffect, useRef, useState, type FormEvent } from "react";
+import { ArrowLeft, ImagePlus, Loader2, Save, ShieldAlert, Star, Trash2 } from "lucide-react";
+import { useEffect, useMemo, useRef, useState, type FormEvent } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import { useAuth } from "@/features/auth/AuthContext";
 import {
   createTrip,
   listManageTrips,
   updateTrip,
-  uploadTripImage,
+  uploadTripImages,
 } from "@/features/trips/api";
 import type { Trip, TripUpsertInput } from "@/shared/api/types";
 import { errorMessage } from "@/shared/api/client";
@@ -19,6 +19,12 @@ import { PageHeader, SectionCard } from "@/shared/components/ui/Section";
 import { useToast } from "@/shared/components/ui/Toast";
 import { isTripCancelled } from "@/shared/lib/trip";
 import { useDocumentTitle } from "@/shared/hooks/useDocumentTitle";
+import {
+  MAX_TRIP_IMAGES,
+  formatBytes,
+  optimizeImageForUpload,
+  validateImageFiles,
+} from "@/shared/lib/images";
 import {
   fromDateInputValue,
   fromDateTimeLocalValue,
@@ -137,11 +143,16 @@ export function StaffTripFormPage() {
   const queryClient = useQueryClient();
   const { showToast } = useToast();
   const [form, setForm] = useState<FormState>(emptyForm);
-  const [imageFile, setImageFile] = useState<File | null>(null);
-  const [imagePreview, setImagePreview] = useState<string | null>(null);
+  const [selectedImages, setSelectedImages] = useState<File[]>([]);
+  const [imagePreviews, setImagePreviews] = useState<
+    Array<{ file: File; url: string; name: string; size: number }>
+  >([]);
+  const [imageError, setImageError] = useState<string | null>(null);
+  const [optimizing, setOptimizing] = useState(false);
   const [errors, setErrors] = useState<string[]>([]);
   const [serverError, setServerError] = useState<string | null>(null);
   const initialized = useRef<number | null>(null);
+  const fileInputRef = useRef<HTMLInputElement | null>(null);
 
   const tripsQuery = useQuery({
     queryKey: ["manageTrips"],
@@ -149,6 +160,17 @@ export function StaffTripFormPage() {
     enabled: editing && isAdmin,
   });
   const trip = (tripsQuery.data ?? []).find((item) => item.id === tripId) ?? null;
+  const existingImages = useMemo(
+    () =>
+      (trip?.images ?? [])
+        .slice()
+        .sort((a, b) => a.order - b.order || a.id - b.id),
+    [trip?.images],
+  );
+  const remainingSlots = Math.max(
+    0,
+    MAX_TRIP_IMAGES - existingImages.length - selectedImages.length,
+  );
   useDocumentTitle(editing ? "Editar viaje" : "Nuevo viaje");
 
   useEffect(() => {
@@ -159,33 +181,54 @@ export function StaffTripFormPage() {
   }, [trip]);
 
   useEffect(() => {
-    if (!imageFile) {
-      setImagePreview(null);
-      return;
-    }
-    const url = URL.createObjectURL(imageFile);
-    setImagePreview(url);
-    return () => URL.revokeObjectURL(url);
-  }, [imageFile]);
+    const previews = selectedImages.map((file) => ({
+      file,
+      url: URL.createObjectURL(file),
+      name: file.name,
+      size: file.size,
+    }));
+    setImagePreviews(previews);
+    return () => previews.forEach((preview) => URL.revokeObjectURL(preview.url));
+  }, [selectedImages]);
 
   const saveMutation = useMutation({
     mutationFn: async () => {
       const payload = buildPayload();
       const saved = editing ? await updateTrip(tripId, payload) : await createTrip(payload);
-      if (imageFile) {
+
+      if (selectedImages.length > 0) {
+        setOptimizing(true);
         try {
-          await uploadTripImage(saved.id, imageFile);
-        } catch {
-          showToast("El viaje se guardó, pero la imagen no se pudo subir.", "error");
+          // La optimización en cliente reduce la subida; el API vuelve a
+          // validar y re-encodear a 1920 px como fuente de verdad.
+          const optimized = await Promise.all(selectedImages.map(optimizeImageForUpload));
+          await uploadTripImages(saved.id, optimized);
+          return { saved, uploadedCount: optimized.length, uploadError: null };
+        } catch (error) {
+          return { saved, uploadedCount: 0, uploadError: errorMessage(error) };
+        } finally {
+          setOptimizing(false);
         }
       }
-      return saved;
+
+      return { saved, uploadedCount: 0, uploadError: null };
     },
-    onSuccess: (saved) => {
+    onSuccess: ({ saved, uploadedCount, uploadError }) => {
       void queryClient.invalidateQueries({ queryKey: ["manageTrips"] });
       void queryClient.invalidateQueries({ queryKey: ["trips"] });
       void queryClient.invalidateQueries({ queryKey: ["trip", saved.id] });
-      showToast(editing ? "Cambios guardados." : "Viaje creado.", "success");
+      if (uploadError) {
+        showToast(`El viaje se guardó, pero las imágenes fallaron: ${uploadError}`, "error");
+      } else {
+        showToast(
+          editing
+            ? "Cambios guardados."
+            : uploadedCount > 0
+              ? `Viaje creado con ${uploadedCount} imagen(es).`
+              : "Viaje creado.",
+          "success",
+        );
+      }
       navigate(`/staff/trips/${saved.id}`);
     },
     onError: (error) => {
@@ -274,10 +317,38 @@ export function StaffTripFormPage() {
     return result;
   };
 
+  const handleImageSelection = (files: FileList | null) => {
+    if (!files?.length) return;
+    setImageError(null);
+
+    const incoming = Array.from(files).filter(
+      (file) =>
+        !selectedImages.some(
+          (current) =>
+            current.name === file.name &&
+            current.size === file.size &&
+            current.lastModified === file.lastModified,
+        ),
+    );
+    const { accepted, errors } = validateImageFiles(incoming, remainingSlots);
+    if (errors.length) setImageError(errors.join(" "));
+    if (accepted.length) setSelectedImages((current) => [...current, ...accepted]);
+    if (fileInputRef.current) fileInputRef.current.value = "";
+  };
+
+  const removeSelectedImage = (index: number) => {
+    setSelectedImages((current) => current.filter((_, position) => position !== index));
+    setImageError(null);
+  };
+
   const submit = (event: FormEvent) => {
     event.preventDefault();
     setServerError(null);
     const validation = validate();
+    if (existingImages.length + selectedImages.length > MAX_TRIP_IMAGES) {
+      validation.push(`El viaje admite un máximo de ${MAX_TRIP_IMAGES} imágenes.`);
+      setImageError(`El viaje admite un máximo de ${MAX_TRIP_IMAGES} imágenes.`);
+    }
     setErrors(validation);
     if (validation.length) {
       window.scrollTo({ top: 0, behavior: "smooth" });
@@ -332,7 +403,7 @@ export function StaffTripFormPage() {
         title={editing ? "Editar viaje" : "Nuevo viaje"}
         subtitle="Configura fechas, cupo, precios y publicación. La opción base se crea automáticamente."
         action={
-          <Button type="submit" size="md" loading={saveMutation.isPending}>
+          <Button type="submit" size="md" loading={saveMutation.isPending || optimizing}>
             <Save className="size-4" />
             {editing ? "Guardar cambios" : "Guardar viaje"}
           </Button>
@@ -567,33 +638,95 @@ export function StaffTripFormPage() {
         </div>
 
         <aside className="space-y-5 lg:sticky lg:top-24">
-          <SectionCard title="Imagen del viaje">
-            <div className="overflow-hidden rounded-[14px] bg-surface-container-high">
-              {imagePreview || trip?.imageUrl ? (
-                <img
-                  src={imagePreview ?? trip?.imageUrl ?? ""}
-                  alt="Vista previa"
-                  className="aspect-[16/10] w-full object-cover"
-                />
-              ) : (
-                <div className="flex aspect-[16/10] flex-col items-center justify-center gap-1 text-on-surface-variant">
-                  <ImagePlus className="size-7" />
-                  <span className="text-label-md">Sin imagen</span>
-                </div>
-              )}
-            </div>
+          <SectionCard
+            title="Imágenes del viaje"
+            subtitle="Hasta 10 imágenes. En un viaje nuevo, la primera será la portada."
+            action={
+              <span className="rounded-full bg-mint px-2.5 py-1 text-label-md text-primary-container">
+                {existingImages.length + selectedImages.length}/{MAX_TRIP_IMAGES}
+              </span>
+            }
+          >
+            {existingImages.length === 0 && imagePreviews.length === 0 ? (
+              <div className="flex aspect-[16/10] flex-col items-center justify-center gap-1 rounded-[14px] bg-surface-container-high text-on-surface-variant">
+                <ImagePlus className="size-7" />
+                <span className="text-label-md">Sin imágenes</span>
+              </div>
+            ) : (
+              <div className="grid grid-cols-2 gap-2">
+                {existingImages.map((image) => (
+                  <div
+                    key={image.id}
+                    className="relative overflow-hidden rounded-[12px] bg-surface-container-high"
+                  >
+                    <img
+                      src={image.url}
+                      alt="Imagen del viaje"
+                      className="aspect-[4/3] w-full object-cover"
+                      loading="lazy"
+                    />
+                    {image.isCover ? (
+                      <span className="absolute top-1.5 left-1.5 inline-flex items-center gap-1 rounded-full bg-white/95 px-2 py-1 text-[10px] font-semibold text-primary-container shadow-sm">
+                        <Star className="size-3 fill-emerald text-emerald" />
+                        Portada
+                      </span>
+                    ) : null}
+                  </div>
+                ))}
+                {imagePreviews.map((preview, index) => (
+                  <div
+                    key={`${preview.name}-${preview.size}-${index}`}
+                    className="relative overflow-hidden rounded-[12px] bg-surface-container-high"
+                  >
+                    <img
+                      src={preview.url}
+                      alt={`Vista previa de ${preview.name}`}
+                      className="aspect-[4/3] w-full object-cover"
+                    />
+                    <button
+                      type="button"
+                      aria-label={`Quitar ${preview.name}`}
+                      onClick={() => removeSelectedImage(index)}
+                      className="absolute top-1.5 right-1.5 grid size-7 place-items-center rounded-full bg-white/95 text-error shadow-sm transition hover:bg-error-container"
+                    >
+                      <Trash2 className="size-3.5" />
+                    </button>
+                    <span className="absolute inset-x-0 bottom-0 truncate bg-slate/70 px-2 py-1 text-[10px] text-white">
+                      {preview.name} · {formatBytes(preview.size)}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            )}
+
             <label className="mt-3 block text-label-md text-on-surface-variant">
-              Subir imagen
+              {remainingSlots > 0 ? "Agregar imágenes" : "Límite alcanzado"}
               <input
+                ref={fileInputRef}
                 type="file"
+                multiple
                 accept="image/jpeg,image/png,image/webp"
-                onChange={(event) => setImageFile(event.target.files?.[0] ?? null)}
-                className="mt-1 block w-full text-body-sm text-on-surface-variant file:mr-3 file:rounded-lg file:border-0 file:bg-mint file:px-3 file:py-2 file:text-label-md file:text-primary-container"
+                disabled={remainingSlots <= 0 || optimizing}
+                onChange={(event) => handleImageSelection(event.target.files)}
+                className="mt-1 block w-full text-body-sm text-on-surface-variant file:mr-3 file:rounded-lg file:border-0 file:bg-mint file:px-3 file:py-2 file:text-label-md file:text-primary-container disabled:opacity-50"
               />
             </label>
             <p className="mt-1 text-body-sm text-on-surface-variant">
-              JPG, PNG o WebP · máximo 20 MB. Se optimiza automáticamente.
+              JPG, PNG o WebP · máximo 20 MB por imagen ·{" "}
+              {remainingSlots === 1 ? "1 espacio disponible" : `${remainingSlots} espacios disponibles`}.
+              Se optimizan a 1920 px y calidad web antes de subirlas.
             </p>
+            {imageError ? (
+              <p role="alert" className="mt-1 rounded-lg bg-error-container px-3 py-2 text-body-sm text-on-error-container">
+                {imageError}
+              </p>
+            ) : null}
+            {optimizing ? (
+              <p className="mt-2 inline-flex items-center gap-2 text-body-sm text-secondary">
+                <Loader2 className="size-4 animate-spin" />
+                Optimizando y subiendo imágenes…
+              </p>
+            ) : null}
           </SectionCard>
 
           <SectionCard title="Visibilidad">
@@ -614,7 +747,7 @@ export function StaffTripFormPage() {
           </SectionCard>
 
           <div className="space-y-2">
-            <Button type="submit" size="lg" className="w-full" loading={saveMutation.isPending}>
+            <Button type="submit" size="lg" className="w-full" loading={saveMutation.isPending || optimizing}>
               <Save className="size-4" />
               {editing ? "Guardar cambios" : "Guardar viaje"}
             </Button>
