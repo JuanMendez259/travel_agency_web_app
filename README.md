@@ -107,6 +107,18 @@ El mapa de arquitectura generado con Graphify está en [docs/architecture-graph.
 - Salida interactiva local: `graphify-out/graph.html` (no versionada).
 - Para regenerarlo: `graphify src` o pide “usa graphify para actualizar el grafo de src”.
 
+### Consulta graph-first
+
+El flujo de trabajo del proyecto exige consultar el grafo **antes** de hacer búsquedas masivas o leer archivos completos:
+
+```bash
+graphify query "¿cómo fluye una reserva desde el checkout hasta la API?" --budget 1500
+graphify path "CheckoutPage" "apiRequest()"
+graphify explain "StaffTripDetailPage"
+```
+
+Las reglas completas, el chequeo de frescura y los comandos de actualización están en [AGENTS.md](AGENTS.md). Si `src/` cambió desde el commit del grafo, actualízalo con `graphify update src`.
+
 ## Despliegue
 
 - **Producción:** https://travel-agency-web-app-sepia.vercel.app
