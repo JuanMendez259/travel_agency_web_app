@@ -35,7 +35,18 @@ import { SectionCard } from "@/shared/components/ui/Section";
 import { Switch } from "@/shared/components/ui/Form";
 import { useToast } from "@/shared/components/ui/Toast";
 import { TripImageCarousel } from "@/shared/components/trips/TripImageCarousel";
+import type { TripOption } from "@/shared/api/types";
 import { buildTripGallery } from "@/shared/lib/trip-gallery";
+import {
+  defaultOptionSelection,
+  isRoomOption,
+  maxRoomsFor,
+  selectionSeats,
+  selectionToOptionInput,
+  withChildren,
+  withRooms,
+  type OptionSelection,
+} from "@/shared/lib/room-selection";
 import { AGENCY } from "@/shared/lib/agency";
 import {
   formatDateLong,
@@ -74,9 +85,7 @@ export function TripDetailPage() {
 
   const [adults, setAdults] = useState(1);
   const [children, setChildren] = useState(0);
-  const [optionSelection, setOptionSelection] = useState<
-    Record<number, { adults: number; children: number }>
-  >({});
+  const [optionSelection, setOptionSelection] = useState<Record<number, OptionSelection>>({});
   const [needsEnabled, setNeedsEnabled] = useState(false);
   const [needsNote, setNeedsNote] = useState("");
   const [capacitySeats, setCapacitySeats] = useState(2);
@@ -96,23 +105,35 @@ export function TripDetailPage() {
     initializedFor.current = trip.id;
     if (trip.hasOptions && activeOptions(trip).length) {
       const first = activeOptions(trip)[0];
-      setOptionSelection({ [first.id]: { adults: 1, children: 0 } });
+      const initial = defaultOptionSelection(first);
+      const fits = !isRoomOption(first) || selectionSeats(first, initial) <= trip.availableSeats;
+      setOptionSelection({
+        [first.id]: fits ? initial : { rooms: 0, adults: 0, children: 0 },
+      });
     }
   }, [trip]);
 
-  const optionLines = useMemo(
+  const optionRows = useMemo(
     () =>
-      options
-        .map((option) => ({
-          tripOptionId: option.id,
-          adults: optionSelection[option.id]?.adults ?? 0,
-          children: optionSelection[option.id]?.children ?? 0,
-        }))
-        .filter((line) => line.adults + line.children > 0),
+      options.map((option) => ({
+        option,
+        selection: optionSelection[option.id] ?? { rooms: 0, adults: 0, children: 0 },
+      })),
     [options, optionSelection],
   );
 
-  const optionSeats = optionLines.reduce((sum, line) => sum + line.adults + line.children, 0);
+  const optionLines = useMemo(
+    () =>
+      optionRows
+        .filter(({ option, selection }) => selectionSeats(option, selection) > 0)
+        .map(({ option, selection }) => selectionToOptionInput(option, selection)),
+    [optionRows],
+  );
+
+  const optionSeats = optionRows.reduce(
+    (sum, { option, selection }) => sum + selectionSeats(option, selection),
+    0,
+  );
   const totalSeats = useOptions ? optionSeats : adults + children;
   const available = trip?.availableSeats ?? 0;
   const capacity = trip ? bookableCapacity(trip) : 0;
@@ -237,13 +258,20 @@ export function TripDetailPage() {
   };
 
   const updateOption = (
-    optionId: number,
-    field: "adults" | "children",
+    option: TripOption,
+    field: "rooms" | "adults" | "children",
     nextValue: number,
   ) => {
     setOptionSelection((current) => {
-      const line = current[optionId] ?? { adults: 0, children: 0 };
-      return { ...current, [optionId]: { ...line, [field]: Math.max(0, nextValue) } };
+      const line = current[option.id] ?? { rooms: 0, adults: 0, children: 0 };
+      let nextLine = line;
+      if (isRoomOption(option)) {
+        if (field === "rooms") nextLine = withRooms(option, line, nextValue);
+        else if (field === "children") nextLine = withChildren(option, line, nextValue);
+      } else {
+        nextLine = { ...line, [field]: Math.max(0, nextValue) };
+      }
+      return { ...current, [option.id]: nextLine };
     });
   };
 
@@ -570,9 +598,12 @@ export function TripDetailPage() {
             ) : useOptions ? (
               <div className="space-y-3">
                 {options.map((option) => {
-                  const line = optionSelection[option.id] ?? { adults: 0, children: 0 };
-                  const lineSeats = line.adults + line.children;
+                  const line = optionSelection[option.id] ?? { rooms: 0, adults: 0, children: 0 };
+                  const lineSeats = selectionSeats(option, line);
                   const remaining = Math.max(0, available - (optionSeats - lineSeats));
+                  const occupancy = option.roomOccupancy ?? 0;
+                  const roomBased = isRoomOption(option);
+                  const maxRooms = maxRoomsFor(option, remaining);
                   const benefitLines = (option.benefits ?? "")
                     .split("\n")
                     .map((lineText) => lineText.replace(/\*\*/g, "").trim())
@@ -593,6 +624,7 @@ export function TripDetailPage() {
                           <div className="flex flex-wrap items-center gap-2">
                             <p className="text-title-md text-on-surface">{option.name}</p>
                             {option.isBase ? <Badge>Base</Badge> : null}
+                            {roomBased ? <Badge>{occupancy} por habitación</Badge> : null}
                           </div>
                           {option.description ? (
                             <p className="mt-0.5 text-body-sm text-on-surface-variant">
@@ -617,24 +649,61 @@ export function TripDetailPage() {
                           ))}
                         </ul>
                       ) : null}
-                      <div className="mt-3 grid gap-3 sm:grid-cols-2">
-                        <Counter
-                          label="Adultos"
-                          hint="Mayor de 12 años"
-                          price={formatMxn(option.priceAdult)}
-                          value={line.adults}
-                          max={Math.max(0, remaining - line.children)}
-                          onChange={(next) => updateOption(option.id, "adults", next)}
-                        />
-                        <Counter
-                          label="Niños"
-                          hint={option.priceChild != null ? "De 0 a 11 años" : "Tarifa de adulto"}
-                          price={formatMxn(option.priceChild ?? option.priceAdult)}
-                          value={line.children}
-                          max={Math.max(0, remaining - line.adults)}
-                          onChange={(next) => updateOption(option.id, "children", next)}
-                        />
-                      </div>
+                      {roomBased ? (
+                        <div className="mt-3 space-y-3">
+                          <Counter
+                            label="Habitaciones"
+                            hint={`${occupancy} persona${occupancy === 1 ? "" : "s"} por habitación`}
+                            value={line.rooms}
+                            max={maxRooms}
+                            onChange={(next) => updateOption(option, "rooms", next)}
+                          />
+                          <div className="grid gap-3 sm:grid-cols-2">
+                            <div className="rounded-[12px] bg-surface-container-low p-3">
+                              <p className="text-title-md text-on-surface">Adultos</p>
+                              <p className="text-body-sm text-on-surface-variant">
+                                Calculados por habitación
+                              </p>
+                              <p className="mt-0.5 text-label-md text-secondary">
+                                {line.adults} · {formatMxn(option.priceAdult)} c/u
+                              </p>
+                            </div>
+                            <Counter
+                              label="Niños"
+                              hint={option.priceChild != null ? "De 0 a 11 años" : "Tarifa de adulto"}
+                              price={formatMxn(option.priceChild ?? option.priceAdult)}
+                              value={line.children}
+                              max={Math.max(0, line.rooms * occupancy - line.rooms)}
+                              disabled={line.rooms === 0}
+                              onChange={(next) => updateOption(option, "children", next)}
+                            />
+                          </div>
+                          <p className="text-label-md text-on-surface-variant">
+                            {line.rooms} habitación{line.rooms === 1 ? "" : "es"} · {line.adults} adulto
+                            {line.adults === 1 ? "" : "s"} · {line.children} niño
+                            {line.children === 1 ? "" : "s"}
+                          </p>
+                        </div>
+                      ) : (
+                        <div className="mt-3 grid gap-3 sm:grid-cols-2">
+                          <Counter
+                            label="Adultos"
+                            hint="Mayor de 12 años"
+                            price={formatMxn(option.priceAdult)}
+                            value={line.adults}
+                            max={Math.max(0, remaining - line.children)}
+                            onChange={(next) => updateOption(option, "adults", next)}
+                          />
+                          <Counter
+                            label="Niños"
+                            hint={option.priceChild != null ? "De 0 a 11 años" : "Tarifa de adulto"}
+                            price={formatMxn(option.priceChild ?? option.priceAdult)}
+                            value={line.children}
+                            max={Math.max(0, remaining - line.adults)}
+                            onChange={(next) => updateOption(option, "children", next)}
+                          />
+                        </div>
+                      )}
                     </div>
                   );
                 })}

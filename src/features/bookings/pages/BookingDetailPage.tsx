@@ -24,6 +24,7 @@ import { Link, useParams, useSearchParams } from "react-router-dom";
 import { useAuth } from "@/features/auth/AuthContext";
 import {
   cancelBooking,
+  cancelBookingItem,
   cancelTicket,
   getBooking,
   payWithWallet,
@@ -111,6 +112,10 @@ export function BookingDetailPage() {
   const [ticketItemId, setTicketItemId] = useState("");
   const [ticketReason, setTicketReason] = useState("");
   const [ticketError, setTicketError] = useState<string | null>(null);
+  const [roomOpen, setRoomOpen] = useState(false);
+  const [roomItemId, setRoomItemId] = useState("");
+  const [roomReason, setRoomReason] = useState("");
+  const [roomError, setRoomError] = useState<string | null>(null);
 
   useDocumentTitle(booking ? `Reserva #${booking.id}` : "Mi reserva");
 
@@ -190,6 +195,29 @@ export function BookingDetailPage() {
     },
   });
 
+  const roomMutation = useMutation({
+    mutationFn: (vars: { itemId: number; reason: string }) =>
+      cancelBookingItem(bookingId, {
+        bookingItemId: vars.itemId,
+        reason: vars.reason,
+      }),
+    onSuccess: (result) => {
+      setRoomOpen(false);
+      setRoomReason("");
+      setRoomError(null);
+      invalidate();
+      showToast(
+        `Habitación cancelada. Se acreditaron ${formatMxn(result.refundAmount)} a tu saldo.`,
+        "success",
+      );
+    },
+    onError: (error) => {
+      const message = errorMessage(error);
+      setRoomError(message);
+      showToast(message, "error");
+    },
+  });
+
   if (!Number.isFinite(bookingId)) {
     return <EmptyState title="Reserva no encontrada" description="El enlace no es válido." />;
   }
@@ -221,6 +249,19 @@ export function BookingDetailPage() {
   const estimatedRefund = refundFor(paid, withinPolicy);
   const passengers = booking.passengers ?? [];
   const items = booking.items ?? [];
+  const hasItems = items.length > 0;
+  const roomItems = items.filter((item) => (item.roomOccupancy ?? 0) > 0);
+  const nonRoomItems = items.filter((item) => !item.roomOccupancy);
+  const cancellableRoomItems = roomItems.filter(
+    (item) => item.id !== booking.holderBookingItemId,
+  );
+  const nonRoomItemIds = new Set(nonRoomItems.map((item) => item.id));
+  const ticketPassengers = hasItems
+    ? passengers.filter(
+        (passenger) =>
+          passenger.bookingItemId == null || nonRoomItemIds.has(passenger.bookingItemId),
+      )
+    : passengers;
   const slots = Math.max(0, booking.numberOfSeats - 1 - passengers.length);
   const progress = Math.min(
     100,
@@ -269,14 +310,45 @@ export function BookingDetailPage() {
       setTicketError("Indica el motivo de la cancelación.");
       return;
     }
-    if (items.length > 1 && !ticketItemId) {
+    if (hasItems && nonRoomItems.length === 0) {
+      setTicketError("Esta reserva solo tiene habitaciones; cancela la línea completa.");
+      return;
+    }
+    if (hasItems && nonRoomItems.length > 1 && !ticketItemId) {
       setTicketError("Selecciona la opción a la que pertenece el boleto.");
       return;
     }
+    const resolvedItemId = ticketItemId
+      ? Number(ticketItemId)
+      : hasItems && nonRoomItems.length === 1
+        ? nonRoomItems[0].id
+        : undefined;
     ticketMutation.mutate({
       passengerId: Number(ticketPassengerId),
-      itemId: ticketItemId ? Number(ticketItemId) : undefined,
+      itemId: resolvedItemId,
       reason: ticketReason.trim(),
+    });
+  };
+
+  const openRoom = () => {
+    setRoomItemId(cancellableRoomItems.length === 1 ? String(cancellableRoomItems[0].id) : "");
+    setRoomReason("");
+    setRoomError(null);
+    setRoomOpen(true);
+  };
+
+  const submitRoom = () => {
+    if (!roomItemId) {
+      setRoomError("Selecciona la habitación que quieres cancelar.");
+      return;
+    }
+    if (!roomReason.trim()) {
+      setRoomError("Indica el motivo de la cancelación.");
+      return;
+    }
+    roomMutation.mutate({
+      itemId: Number(roomItemId),
+      reason: roomReason.trim(),
     });
   };
 
@@ -626,6 +698,13 @@ export function BookingDetailPage() {
                             ? ` · ${item.children} niño${item.children === 1 ? "" : "s"}`
                             : ""}
                         </p>
+                        {item.roomOccupancy ? (
+                          <p className="text-body-sm text-secondary">
+                            {item.rooms ?? 1} habitación
+                            {(item.rooms ?? 1) === 1 ? "" : "es"} · {item.roomOccupancy} persona
+                            {item.roomOccupancy === 1 ? "" : "s"} por habitación
+                          </p>
+                        ) : null}
                       </div>
                       <span className="shrink-0 text-on-surface">
                         {formatMxn(
@@ -787,11 +866,23 @@ export function BookingDetailPage() {
                 <Button variant="danger" size="md" onClick={() => setCancelOpen(true)}>
                   Cancelar reserva completa
                 </Button>
-                {passengers.length ? (
+                {ticketPassengers.length ? (
                   <Button variant="outline" size="md" onClick={() => setTicketOpen(true)}>
                     <XCircle className="size-4" />
                     Cancelar un boleto
                   </Button>
+                ) : null}
+                {cancellableRoomItems.length ? (
+                  <Button variant="outline" size="md" onClick={openRoom}>
+                    <XCircle className="size-4" />
+                    Cancelar habitación
+                  </Button>
+                ) : null}
+                {roomItems.length > 0 && cancellableRoomItems.length === 0 ? (
+                  <p className="w-full rounded-lg bg-surface-container-low p-2.5 text-body-sm text-on-surface-variant">
+                    La habitación incluye al titular. Para cancelarla, usa “Cancelar reserva
+                    completa”.
+                  </p>
                 ) : null}
               </div>
             </SectionCard>
@@ -992,7 +1083,7 @@ export function BookingDetailPage() {
             onChange={(event) => setTicketPassengerId(event.target.value)}
           >
             <option value="">Selecciona un pasajero</option>
-            {passengers.map((passenger) => (
+            {ticketPassengers.map((passenger) => (
               <option key={passenger.id} value={passenger.id}>
                 {passenger.name ?? `Pasajero ${passenger.id}`}
                 {passenger.seatNumber ? ` · Asiento ${passenger.seatNumber}` : ""}
@@ -1000,14 +1091,14 @@ export function BookingDetailPage() {
               </option>
             ))}
           </Select>
-          {items.length > 1 ? (
+          {nonRoomItems.length > 1 ? (
             <Select
               label="Opción del boleto"
               value={ticketItemId}
               onChange={(event) => setTicketItemId(event.target.value)}
             >
               <option value="">Selecciona una opción</option>
-              {items.map((item) => (
+              {nonRoomItems.map((item) => (
                 <option key={item.id} value={item.id}>
                   {item.optionName ?? `Opción ${item.id}`}
                 </option>
@@ -1028,6 +1119,60 @@ export function BookingDetailPage() {
           {ticketError ? (
             <p role="alert" className="text-body-sm text-error">
               {ticketError}
+            </p>
+          ) : null}
+        </div>
+      </Modal>
+
+      <Modal
+        open={roomOpen}
+        onClose={() => setRoomOpen(false)}
+        title="Cancelar habitación"
+        description="Se cancelará la línea completa de habitación y todos sus boletos."
+        footer={
+          <div className="flex gap-2">
+            <Button variant="outline" className="flex-1" onClick={() => setRoomOpen(false)}>
+              Volver
+            </Button>
+            <Button
+              variant="danger"
+              className="flex-1"
+              loading={roomMutation.isPending}
+              onClick={submitRoom}
+            >
+              Cancelar habitación
+            </Button>
+          </div>
+        }
+      >
+        <div className="space-y-3">
+          <Select
+            label="Habitación"
+            value={roomItemId}
+            onChange={(event) => setRoomItemId(event.target.value)}
+          >
+            <option value="">Selecciona una habitación</option>
+            {cancellableRoomItems.map((item) => (
+              <option key={item.id} value={item.id}>
+                {item.optionName ?? `Habitación ${item.id}`} · {item.rooms ?? 1} habitación(es) ·{" "}
+                {item.adults + item.children} persona(s)
+              </option>
+            ))}
+          </Select>
+          <TextArea
+            label="Motivo"
+            value={roomReason}
+            maxLength={500}
+            onChange={(event) => setRoomReason(event.target.value)}
+            placeholder="Cuéntanos por qué cancelas esta habitación."
+          />
+          <p className="rounded-lg bg-surface-container-low p-2.5 text-body-sm text-on-surface-variant">
+            El reembolso de todos los boletos de la línea se calcula con la política del viaje y se
+            acredita a tu saldo.
+          </p>
+          {roomError ? (
+            <p role="alert" className="text-body-sm text-error">
+              {roomError}
             </p>
           ) : null}
         </div>

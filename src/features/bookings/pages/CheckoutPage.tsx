@@ -42,6 +42,7 @@ import { useDocumentTitle } from "@/shared/hooks/useDocumentTitle";
 import { formatMxn, minMoney, toDecimal } from "@/shared/lib/money";
 import { formatTripDetailDate } from "@/shared/lib/dates";
 import { activeOptions, bookableCapacity, isBookingClosed } from "@/shared/lib/trip";
+import { defaultOptionSelection, selectionSeats, selectionToOptionInput } from "@/shared/lib/room-selection";
 import { cn } from "@/shared/lib/cn";
 
 type PassengerDraft = { name: string; age: string };
@@ -89,15 +90,16 @@ export function CheckoutPage() {
   useEffect(() => {
     if (!trip || draft) return;
     const options = activeOptions(trip);
+    const firstSelection = options[0] ? defaultOptionSelection(options[0]) : null;
     const fallback: CheckoutDraft =
-      trip.hasOptions && options.length
+      trip.hasOptions && options.length && firstSelection
         ? {
             tripId: trip.id,
             useOptions: true,
-            options: [{ tripOptionId: options[0].id, adults: 1, children: 0 }],
+            options: [selectionToOptionInput(options[0], firstSelection)],
             adults: 0,
             children: 0,
-            totalSeats: 1,
+            totalSeats: selectionSeats(options[0], firstSelection),
             specialNeedsNote: null,
           }
         : {
@@ -391,6 +393,10 @@ export function CheckoutPage() {
             name: option.name,
             adults: line.adults,
             children: line.children,
+            rooms: option.roomOccupancy
+              ? Math.floor((line.adults + line.children) / option.roomOccupancy)
+              : 0,
+            roomOccupancy: option.roomOccupancy ?? null,
             total: toDecimal(option.priceAdult)
               .times(line.adults)
               .plus(toDecimal(childPrice).times(line.children))
@@ -677,6 +683,13 @@ export function CheckoutPage() {
                   <div key={line.name} className="flex items-start justify-between gap-3">
                     <div>
                       <p className="text-on-surface">{line.name}</p>
+                      {line.rooms > 0 ? (
+                        <p className="text-body-sm text-secondary">
+                          {line.rooms} habitación{line.rooms === 1 ? "" : "es"} ·{" "}
+                          {line.roomOccupancy} persona{line.roomOccupancy === 1 ? "" : "s"} por
+                          habitación
+                        </p>
+                      ) : null}
                       <p className="text-body-sm text-on-surface-variant">
                         {line.adults} adulto{line.adults === 1 ? "" : "s"}
                         {line.children > 0

@@ -92,6 +92,7 @@ export type TripOption = {
   benefits: string | null;
   isActive: boolean;
   order: number;
+  roomOccupancy?: number | null;
   capacityMode?: "Shared" | "Own";
   createdAt?: string;
   isBase: boolean;
@@ -107,6 +108,7 @@ export type TripOptionInput = {
   benefits?: string | null;
   isActive: boolean;
   order: number;
+  roomOccupancy?: number | null;
 };
 
 export type PointOfInterest = {
@@ -217,6 +219,7 @@ export type BookingPassenger = {
   checkedIn: boolean;
   checkedInAt: string | null;
   seatNumber: number | null;
+  bookingItemId: number | null;
 };
 
 export type BookingItem = {
@@ -228,6 +231,8 @@ export type BookingItem = {
   unitPriceAdult: number | string;
   unitPriceChild: number | string | null;
   optionName: string | null;
+  roomOccupancy: number | null;
+  rooms: number | null;
   tripOption?: TripOption | null;
 };
 
@@ -260,6 +265,7 @@ export type Booking = {
   qrToken: string | null;
   cancelledAt: string | null;
   cancelledByUserId: number | null;
+  holderBookingItemId: number | null;
   user?: UserProfile | null;
   trip?: Trip | null;
   payments?: Payment[];

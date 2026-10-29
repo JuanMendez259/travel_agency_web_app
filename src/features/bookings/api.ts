@@ -87,6 +87,16 @@ export function cancelTicket(
   });
 }
 
+export function cancelBookingItem(
+  bookingId: number,
+  payload: { bookingItemId: number; reason: string },
+) {
+  return apiRequest<CancelTicketResult>(`/api/bookings/${bookingId}/cancel-item`, {
+    method: "POST",
+    body: payload,
+  });
+}
+
 export function checkinBooking(bookingId: number, checkedIn: boolean) {
   return apiRequest<Booking>(`/api/bookings/${bookingId}/checkin`, {
     method: "PUT",

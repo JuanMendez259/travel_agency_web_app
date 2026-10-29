@@ -30,6 +30,7 @@ type FormState = {
   description: string;
   priceAdult: string;
   priceChild: string;
+  roomOccupancy: string;
   benefits: string;
   isActive: boolean;
 };
@@ -39,6 +40,7 @@ const emptyForm = (): FormState => ({
   description: "",
   priceAdult: "",
   priceChild: "",
+  roomOccupancy: "",
   benefits: "",
   isActive: true,
 });
@@ -68,6 +70,7 @@ export function StaffTripOptionsPage() {
       description: editing.description ?? "",
       priceAdult: String(editing.priceAdult),
       priceChild: editing.priceChild != null ? String(editing.priceChild) : "",
+      roomOccupancy: editing.roomOccupancy != null ? String(editing.roomOccupancy) : "",
       benefits: editing.benefits ?? "",
       isActive: editing.isActive,
     });
@@ -86,6 +89,10 @@ export function StaffTripOptionsPage() {
         description: form.description.trim() || null,
         priceAdult: Number(form.priceAdult),
         priceChild: form.priceChild.trim() ? Number(form.priceChild) : null,
+        roomOccupancy:
+          trip?.includesHotel && form.roomOccupancy.trim()
+            ? Number(form.roomOccupancy)
+            : null,
         benefits: form.benefits.trim() || null,
         isActive: form.isActive,
         order: editing?.order ?? Math.max(0, ...options.map((option) => option.order)) + 1,
@@ -115,6 +122,7 @@ export function StaffTripOptionsPage() {
         description: option.description,
         priceAdult: Number(option.priceAdult),
         priceChild: option.priceChild != null ? Number(option.priceChild) : null,
+        roomOccupancy: option.roomOccupancy ?? null,
         benefits: option.benefits,
         isActive: !option.isActive,
         order: option.order,
@@ -170,6 +178,11 @@ export function StaffTripOptionsPage() {
       result.push("El precio adulto debe ser mayor o igual a 0.");
     if (form.priceChild.trim() !== "" && Number(form.priceChild) < 0)
       result.push("El precio niño no puede ser negativo.");
+    if (trip?.includesHotel) {
+      const occupancy = Number(form.roomOccupancy);
+      if (!form.roomOccupancy.trim() || !Number.isInteger(occupancy) || occupancy < 1 || occupancy > 8)
+        result.push("Indica cuántas personas caben por habitación (1 a 8).");
+    }
     if (result.length) {
       setErrors(result);
       return;
@@ -225,6 +238,17 @@ export function StaffTripOptionsPage() {
                 onChange={(event) => setForm({ ...form, priceChild: event.target.value })}
               />
             </div>
+            {trip?.includesHotel ? (
+              <TextField
+                label="Personas por habitación"
+                type="number"
+                min={1}
+                max={8}
+                value={form.roomOccupancy}
+                placeholder="Ej. 1 sencilla, 2 doble, 3 triple"
+                onChange={(event) => setForm({ ...form, roomOccupancy: event.target.value })}
+              />
+            ) : null}
             <TextArea
               label="Beneficios (uno por línea)"
               value={form.benefits}
@@ -293,6 +317,9 @@ export function StaffTripOptionsPage() {
                         <p className="inline-flex flex-wrap items-center gap-1.5 text-title-md text-on-surface">
                           {option.name}
                           {option.isBase ? <Badge>Base</Badge> : null}
+                          {option.roomOccupancy ? (
+                            <Badge>{option.roomOccupancy} por habitación</Badge>
+                          ) : null}
                           {!option.isActive ? <Badge tone="cancelled">Inactiva</Badge> : null}
                         </p>
                         <p className="text-body-sm text-on-surface-variant">
