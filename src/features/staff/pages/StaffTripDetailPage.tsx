@@ -41,7 +41,8 @@ import { ErrorState } from "@/shared/components/feedback/ErrorState";
 import { EmptyState } from "@/shared/components/feedback/EmptyState";
 import { Badge } from "@/shared/components/ui/Badge";
 import { Button, buttonClasses } from "@/shared/components/ui/Button";
-import { CoverImage, PageLoader, RichText } from "@/shared/components/ui/Media";
+import { PageLoader, RichText } from "@/shared/components/ui/Media";
+import { TripImageCarousel } from "@/shared/components/trips/TripImageCarousel";
 import { ConfirmDialog, Modal } from "@/shared/components/ui/Modal";
 import { PageHeader, SectionCard, StatCard } from "@/shared/components/ui/Section";
 import { BookingStatusBadge } from "@/shared/components/ui/StatusBadge";
@@ -263,33 +264,40 @@ export function StaffTripDetailPage() {
       ) : null}
 
       <div className="overflow-hidden rounded-card bg-white shadow-layer-1">
-        <div className="relative">
-          <CoverImage src={trip.imageUrl} alt={trip.title} ratio="aspect-[16/7] sm:aspect-[21/7]" />
-          <div className="absolute inset-0 bg-gradient-to-t from-slate/75 via-transparent to-transparent" />
-          <div className="absolute inset-x-0 bottom-0 flex flex-wrap items-end justify-between gap-2 p-4 text-white">
-            <div>
-              <div className="flex flex-wrap gap-1.5">
-                {cancelled ? (
-                  <Badge tone="cancelled">CANCELADO</Badge>
-                ) : (
-                  <>
-                    {!trip.isActive ? <Badge tone="cancelled">PAUSADO</Badge> : null}
-                    {trip.finalized ? <Badge tone="neutral">Finalizado</Badge> : null}
-                    {trip.departureCompleted ? <Badge tone="pending">Salida realizada</Badge> : null}
-                  </>
-                )}
-                <Badge>{transportLabel(trip.transportType)}</Badge>
+        <TripImageCarousel
+          images={trip.images}
+          fallbackUrl={trip.imageUrl}
+          alt={trip.title}
+          ratio="aspect-[16/7] sm:aspect-[21/7]"
+          overlay={
+            <>
+              <div className="pointer-events-none absolute inset-0 bg-gradient-to-t from-slate/75 via-transparent to-transparent" />
+              <div className="absolute inset-x-0 bottom-0 flex flex-wrap items-end justify-between gap-2 p-4 text-white">
+                <div>
+                  <div className="flex flex-wrap gap-1.5">
+                    {cancelled ? (
+                      <Badge tone="cancelled">CANCELADO</Badge>
+                    ) : (
+                      <>
+                        {!trip.isActive ? <Badge tone="cancelled">PAUSADO</Badge> : null}
+                        {trip.finalized ? <Badge tone="neutral">Finalizado</Badge> : null}
+                        {trip.departureCompleted ? <Badge tone="pending">Salida realizada</Badge> : null}
+                      </>
+                    )}
+                    <Badge>{transportLabel(trip.transportType)}</Badge>
+                  </div>
+                  <p className="mt-1.5 inline-flex items-center gap-1.5 text-body-sm text-white/90">
+                    <MapPinned className="size-4" />
+                    {trip.destination}
+                  </p>
+                </div>
+                <p className="text-body-sm text-white/90">
+                  {formatMxn(trip.price)} · {capacity} asientos
+                </p>
               </div>
-              <p className="mt-1.5 inline-flex items-center gap-1.5 text-body-sm text-white/90">
-                <MapPinned className="size-4" />
-                {trip.destination}
-              </p>
-            </div>
-            <p className="text-body-sm text-white/90">
-              {formatMxn(trip.price)} · {capacity} asientos
-            </p>
-          </div>
-        </div>
+            </>
+          }
+        />
         <div className="grid gap-2 p-3 sm:grid-cols-4">
           <StatCard label="Vendidos" value={sold} icon={<Ticket className="size-4" />} />
           <StatCard
