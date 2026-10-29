@@ -11,6 +11,7 @@ export function TripImageCarousel({
   ratio = "aspect-[16/10]",
   overlay,
   className,
+  priority = false,
 }: {
   images?: TripImage[] | null;
   fallbackUrl?: string | null;
@@ -18,6 +19,7 @@ export function TripImageCarousel({
   ratio?: string;
   overlay?: ReactNode;
   className?: string;
+  priority?: boolean;
 }) {
   const gallery = useMemo<{ id?: number; url: string }[]>(() => {
     const ordered = [...(images ?? [])]
@@ -49,7 +51,7 @@ export function TripImageCarousel({
         <img
           src={currentImage.url}
           alt={imageAlt}
-          loading="lazy"
+          loading={priority ? "eager" : "lazy"}
           className="size-full object-cover"
         />
         {overlay}
@@ -73,37 +75,39 @@ export function TripImageCarousel({
             >
               <ChevronRight className="size-5" />
             </button>
-            <span className="absolute top-2 right-2 z-10 rounded-full bg-slate/70 px-2 py-1 text-label-sm text-white">
-              {currentIndex + 1} / {gallery.length}
-            </span>
           </>
         ) : null}
       </div>
       {hasMultiple ? (
-        <div className="flex gap-2 overflow-x-auto p-2" aria-label="Miniaturas">
-          {gallery.map((image, index) => {
-            const isActive = index === currentIndex;
-            return (
-              <button
-                key={`${image.id ?? "respaldo"}-${image.url}`}
-                type="button"
-                aria-label={`Ver imagen ${index + 1} de ${gallery.length}`}
-                aria-current={isActive ? "true" : undefined}
-                onClick={() => setActiveIndex(index)}
-                className={cn(
-                  "relative h-14 w-20 shrink-0 overflow-hidden rounded-lg ring-2 transition",
-                  isActive ? "ring-secondary" : "opacity-70 ring-transparent hover:opacity-100",
-                )}
-              >
-                <img
-                  src={image.url}
-                  alt={`Miniatura ${index + 1} de ${alt}`}
-                  loading="lazy"
-                  className="size-full object-cover"
-                />
-              </button>
-            );
-          })}
+        <div className="flex items-center gap-2 p-2" aria-label="Miniaturas">
+          <div className="flex flex-1 gap-2 overflow-x-auto">
+            {gallery.map((image, index) => {
+              const isActive = index === currentIndex;
+              return (
+                <button
+                  key={`${image.id ?? "respaldo"}-${image.url}`}
+                  type="button"
+                  aria-label={`Ver imagen ${index + 1} de ${gallery.length}`}
+                  aria-current={isActive ? "true" : undefined}
+                  onClick={() => setActiveIndex(index)}
+                  className={cn(
+                    "relative h-14 w-20 shrink-0 overflow-hidden rounded-lg ring-2 transition",
+                    isActive ? "ring-secondary" : "opacity-70 ring-transparent hover:opacity-100",
+                  )}
+                >
+                  <img
+                    src={image.url}
+                    alt={`Miniatura ${index + 1} de ${alt}`}
+                    loading="lazy"
+                    className="size-full object-cover"
+                  />
+                </button>
+              );
+            })}
+          </div>
+          <span className="shrink-0 px-1 text-label-sm text-on-surface-variant">
+            {currentIndex + 1} / {gallery.length}
+          </span>
         </div>
       ) : null}
     </div>

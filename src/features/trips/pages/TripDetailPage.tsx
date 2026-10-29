@@ -29,10 +29,11 @@ import { Badge } from "@/shared/components/ui/Badge";
 import { Button, buttonClasses } from "@/shared/components/ui/Button";
 import { Counter } from "@/shared/components/ui/Counter";
 import { TextArea } from "@/shared/components/ui/Form";
-import { CoverImage, PageLoader, RichText } from "@/shared/components/ui/Media";
+import { PageLoader, RichText } from "@/shared/components/ui/Media";
 import { SectionCard } from "@/shared/components/ui/Section";
 import { Switch } from "@/shared/components/ui/Form";
 import { useToast } from "@/shared/components/ui/Toast";
+import { TripImageCarousel } from "@/shared/components/trips/TripImageCarousel";
 import { AGENCY } from "@/shared/lib/agency";
 import {
   formatDateLong,
@@ -253,68 +254,78 @@ export function TripDetailPage() {
       </Link>
 
       <div className="relative overflow-hidden rounded-[24px] bg-surface-container-high">
-        <CoverImage src={trip.imageUrl} alt={trip.title} ratio="aspect-[16/10] sm:aspect-[21/9]" priority />
-        <div className="absolute inset-0 bg-gradient-to-t from-slate/80 via-slate/10 to-transparent" />
-        <div className="absolute inset-x-0 top-0 flex items-center justify-between gap-2 p-3">
-          <Link
-            to="/explore"
-            className="inline-flex items-center gap-1.5 rounded-full bg-white/90 px-3 py-2 text-label-md text-primary-container shadow-layer-2 backdrop-blur"
-          >
-            <ArrowLeft className="size-4" />
-            Volver
-          </Link>
-          <div className="flex gap-2">
-            <button
-              type="button"
-              onClick={() => void handleShare()}
-              aria-label="Compartir viaje"
-              className="grid size-11 place-items-center rounded-[12px] bg-white/90 text-primary-container shadow-layer-2 backdrop-blur transition active:scale-95"
-            >
-              <Share2 className="size-5" />
-            </button>
-            <button
-              type="button"
-              aria-label={favorite ? "Quitar de favoritos" : "Guardar en favoritos"}
-              aria-pressed={favorite}
-              onClick={() =>
-                toggleFavorite.mutate(
-                  { tripId: trip.id, favorite },
-                  {
-                    onError: () => showToast("No se pudo actualizar favoritos.", "error"),
-                    onSuccess: () =>
-                      showToast(
-                        favorite ? "Viaje quitado de favoritos." : "Viaje guardado en favoritos.",
-                        "success",
-                      ),
-                  },
-                )
-              }
-              className="grid size-11 place-items-center rounded-[12px] bg-white/90 text-primary-container shadow-layer-2 backdrop-blur transition active:scale-95"
-            >
-              <Heart className={cn("size-5", favorite && "fill-emerald text-emerald")} />
-            </button>
-          </div>
-        </div>
-        <div className="absolute inset-x-0 bottom-0 p-4 text-white sm:p-6">
-          <div className="flex flex-wrap gap-2">
-            <Badge className="bg-white/90 text-primary-container">
-              <Bus className="size-3.5" />
-              {transportLabel(trip.transportType)}
-            </Badge>
-            {trip.category ? (
-              <Badge className="bg-secondary text-white">{trip.category}</Badge>
-            ) : null}
-            {!trip.isActive ? <Badge tone="cancelled">Viaje pausado</Badge> : null}
-            {trip.finalized ? <Badge tone="neutral">Finalizado</Badge> : null}
-          </div>
-          <h1 className="mt-2 max-w-3xl text-[28px] leading-tight font-extrabold tracking-[-0.02em] sm:text-[38px]">
-            {trip.title}
-          </h1>
-          <p className="mt-1 inline-flex items-center gap-1.5 text-body-md text-white/90">
-            <MapPin className="size-4" />
-            {trip.destination}
-          </p>
-        </div>
+        <TripImageCarousel
+          images={trip.images}
+          fallbackUrl={trip.imageUrl}
+          alt={trip.title}
+          ratio="aspect-[16/10] sm:aspect-[21/9]"
+          priority
+          overlay={
+            <>
+              <div className="pointer-events-none absolute inset-0 bg-gradient-to-t from-slate/80 via-slate/10 to-transparent" />
+              <div className="absolute inset-x-0 top-0 flex items-center justify-between gap-2 p-3">
+                <Link
+                  to="/explore"
+                  className="inline-flex items-center gap-1.5 rounded-full bg-white/90 px-3 py-2 text-label-md text-primary-container shadow-layer-2 backdrop-blur"
+                >
+                  <ArrowLeft className="size-4" />
+                  Volver
+                </Link>
+                <div className="flex gap-2">
+                  <button
+                    type="button"
+                    onClick={() => void handleShare()}
+                    aria-label="Compartir viaje"
+                    className="grid size-11 place-items-center rounded-[12px] bg-white/90 text-primary-container shadow-layer-2 backdrop-blur transition active:scale-95"
+                  >
+                    <Share2 className="size-5" />
+                  </button>
+                  <button
+                    type="button"
+                    aria-label={favorite ? "Quitar de favoritos" : "Guardar en favoritos"}
+                    aria-pressed={favorite}
+                    onClick={() =>
+                      toggleFavorite.mutate(
+                        { tripId: trip.id, favorite },
+                        {
+                          onError: () => showToast("No se pudo actualizar favoritos.", "error"),
+                          onSuccess: () =>
+                            showToast(
+                              favorite ? "Viaje quitado de favoritos." : "Viaje guardado en favoritos.",
+                              "success",
+                            ),
+                        },
+                      )
+                    }
+                    className="grid size-11 place-items-center rounded-[12px] bg-white/90 text-primary-container shadow-layer-2 backdrop-blur transition active:scale-95"
+                  >
+                    <Heart className={cn("size-5", favorite && "fill-emerald text-emerald")} />
+                  </button>
+                </div>
+              </div>
+              <div className="absolute inset-x-0 bottom-0 p-4 text-white sm:p-6">
+                <div className="flex flex-wrap gap-2">
+                  <Badge className="bg-white/90 text-primary-container">
+                    <Bus className="size-3.5" />
+                    {transportLabel(trip.transportType)}
+                  </Badge>
+                  {trip.category ? (
+                    <Badge className="bg-secondary text-white">{trip.category}</Badge>
+                  ) : null}
+                  {!trip.isActive ? <Badge tone="cancelled">Viaje pausado</Badge> : null}
+                  {trip.finalized ? <Badge tone="neutral">Finalizado</Badge> : null}
+                </div>
+                <h1 className="mt-2 max-w-3xl text-[28px] leading-tight font-extrabold tracking-[-0.02em] sm:text-[38px]">
+                  {trip.title}
+                </h1>
+                <p className="mt-1 inline-flex items-center gap-1.5 text-body-md text-white/90">
+                  <MapPin className="size-4" />
+                  {trip.destination}
+                </p>
+              </div>
+            </>
+          }
+        />
       </div>
 
       {closed ? (

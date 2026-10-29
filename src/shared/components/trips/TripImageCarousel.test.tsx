@@ -1,4 +1,4 @@
-import { fireEvent, render, screen } from "@testing-library/react";
+import { fireEvent, render, screen, within } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
 import type { TripImage } from "@/shared/api/types";
 import { TripImageCarousel } from "@/shared/components/trips/TripImageCarousel";
@@ -37,6 +37,38 @@ describe("TripImageCarousel", () => {
     expect(
       screen.getByRole("img", { name: "Viaje a Oaxaca (1 de 2)" }),
     ).toHaveAttribute("src", "https://cdn.test/uno.jpg");
+  });
+
+  it("muestra el contador junto a las miniaturas y lo actualiza", () => {
+    const images = [
+      makeImage({ id: 1, order: 1, url: "https://cdn.test/uno.jpg" }),
+      makeImage({ id: 2, order: 2, url: "https://cdn.test/dos.jpg" }),
+    ];
+
+    render(<TripImageCarousel images={images} alt="Viaje a Oaxaca" />);
+    const thumbnails = screen.getByLabelText("Miniaturas");
+
+    expect(within(thumbnails).getByText("1 / 2")).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: "Imagen siguiente" }));
+
+    expect(within(thumbnails).getByText("2 / 2")).toBeInTheDocument();
+  });
+
+  it("carga la imagen principal con prioridad cuando se solicita", () => {
+    render(
+      <TripImageCarousel
+        images={[]}
+        fallbackUrl="https://cdn.test/portada.jpg"
+        alt="Viaje prioritario"
+        priority
+      />,
+    );
+
+    expect(screen.getByRole("img", { name: "Viaje prioritario" })).toHaveAttribute(
+      "loading",
+      "eager",
+    );
   });
 
   it("vuelve a la última imagen al retroceder desde la primera", () => {
