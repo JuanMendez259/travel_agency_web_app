@@ -510,6 +510,13 @@ export function TripDetailPage() {
               ) : null}
             </div>
 
+            {trip.hasOptions && options.length === 0 ? (
+              <div className="mb-3 rounded-[14px] bg-surface-container-low p-4 text-body-sm text-on-surface-variant">
+                <p className="text-title-md text-on-surface">Sin opciones activas</p>
+                <p className="mt-1">Se usa la tarifa general del viaje.</p>
+              </div>
+            ) : null}
+
             {!trip.isActive ? (
               <div className="rounded-[14px] bg-error-container p-4 text-body-md text-on-error-container">
                 Este viaje está pausado y no acepta nuevas reservas. Tu reserva existente sigue

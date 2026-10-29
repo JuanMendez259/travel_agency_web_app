@@ -3,6 +3,7 @@ import { ArrowLeft, Check, Pencil, Plus, Power, Save, Tag, Trash2 } from "lucide
 import { useEffect, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import { useAuth } from "@/features/auth/AuthContext";
+import { isStaffRole } from "@/features/auth/session";
 import {
   createTripOption,
   deleteTripOption,
@@ -46,7 +47,7 @@ export function StaffTripOptionsPage() {
   const { id } = useParams();
   const tripId = Number(id);
   const { session } = useAuth();
-  const isAdmin = session?.role === "Admin";
+  const isStaff = isStaffRole(session?.role);
   const { showToast } = useToast();
   const queryClient = useQueryClient();
   const [form, setForm] = useState<FormState>(emptyForm);
@@ -135,11 +136,11 @@ export function StaffTripOptionsPage() {
     onError: (error) => showToast(errorMessage(error), "error"),
   });
 
-  if (!isAdmin) {
+  if (!isStaff) {
     return (
       <EmptyState
         title="Acceso restringido"
-        description="Solo los administradores administran las opciones del viaje."
+        description="Solo el personal de la agencia administra las opciones del viaje."
         action={<Link to={`/staff/trips/${tripId}`} className={buttonClasses({ variant: "secondary" })}>Volver al viaje</Link>}
       />
     );
@@ -163,6 +164,8 @@ export function StaffTripOptionsPage() {
     const result: string[] = [];
     if (!form.name.trim()) result.push("El nombre de la opción es obligatorio.");
     if (form.name.length > 80) result.push("El nombre no puede superar 80 caracteres.");
+    if (form.description.length > 400)
+      result.push("La descripción no puede superar 400 caracteres.");
     if (form.priceAdult.trim() === "" || Number(form.priceAdult) < 0)
       result.push("El precio adulto debe ser mayor o igual a 0.");
     if (form.priceChild.trim() !== "" && Number(form.priceChild) < 0)

@@ -129,13 +129,13 @@ export const router = createBrowserRouter([
                   { path: "staff/trips", element: <StaffTripsPage /> },
                   { path: "staff/trips/:id", element: <StaffTripDetailPage /> },
                   { path: "staff/trips/:id/seats", element: <StaffTripSeatsPage /> },
+                  { path: "staff/trips/:id/options", element: <StaffTripOptionsPage /> },
                   {
                     element: <RequireRole roles={["Admin"]} />,
                     children: [
                       { path: "staff/trips/new", element: <StaffTripFormPage /> },
                       { path: "staff/trips/:id/edit", element: <StaffTripFormPage /> },
                       { path: "staff/trips/:id/bookings", element: <StaffTripBookingsPage /> },
-                      { path: "staff/trips/:id/options", element: <StaffTripOptionsPage /> },
                       { path: "staff/trips/:id/map", element: <StaffTripMapPage /> },
                       { path: "staff/trips/:id/checkin", element: <StaffCheckinPage /> },
                       { path: "staff/trips/:id/scan", element: <StaffScanPage /> },

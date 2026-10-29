@@ -26,6 +26,7 @@ import {
 import { useMemo, useState, type ReactNode } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import { useAuth } from "@/features/auth/AuthContext";
+import { isStaffRole } from "@/features/auth/session";
 import {
   cancelTrip,
   deleteTrip,
@@ -61,6 +62,7 @@ export function StaffTripDetailPage() {
   const navigate = useNavigate();
   const { session } = useAuth();
   const isAdmin = session?.role === "Admin";
+  const isStaff = isStaffRole(session?.role);
   const queryClient = useQueryClient();
   const { showToast } = useToast();
   const [finalizeOpen, setFinalizeOpen] = useState(false);
@@ -348,7 +350,7 @@ export function StaffTripDetailPage() {
             subtitle="El cupo efectivo nunca supera la capacidad del hotel"
             icon={<Hotel className="size-5" />}
             action={
-              isAdmin && !cancelled ? (
+              isStaff && !cancelled ? (
                 <Link to={`/staff/trips/${trip.id}/options`} className={buttonClasses({ variant: "outline", size: "sm" })}>
                   Administrar opciones
                 </Link>
